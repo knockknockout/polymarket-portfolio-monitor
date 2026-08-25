@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tablero de posiciones — Polymarket</title>
+<title>Pulse — Monitor de portafolio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -18,6 +18,9 @@
     --rust:#c1594e;
     --hairline: rgba(236,230,216,0.10);
     --radius: 10px;
+    /* categorical wallet colors — dataviz skill's validated default order (dark surface) */
+    --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500;
+    --c5:#d55181; --c6:#3aa63a; --c7:#9085e9; --c8:#e66767;
   }
 
   *{ box-sizing:border-box; }
@@ -26,806 +29,256 @@
     *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
   }
 
-  html,body{
-    margin:0;
-    background:var(--ink-900);
-    color:var(--paper);
-    font-family:'IBM Plex Sans', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-
+  html,body{ margin:0; background:var(--ink-900); color:var(--paper); font-family:'IBM Plex Sans', sans-serif; -webkit-font-smoothing:antialiased; }
   body{
     background-image:
       radial-gradient(ellipse 900px 500px at 15% -10%, rgba(227,162,60,0.07), transparent 60%),
       radial-gradient(ellipse 700px 500px at 100% 0%, rgba(90,171,143,0.06), transparent 55%);
   }
-
-  .app{
-    max-width:960px;
-    margin:0 auto;
-    padding:28px 20px 80px;
-  }
-
+  .app{ max-width:1000px; margin:0 auto; padding:28px 20px 80px; }
   a{ color:var(--amber); }
-
   ::selection{ background:var(--amber); color:var(--ink-900); }
+  :focus-visible{ outline:2px solid var(--amber); outline-offset:2px; border-radius:4px; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
 
-  :focus-visible{
-    outline:2px solid var(--amber);
-    outline-offset:2px;
-    border-radius:4px;
+  /* ---------- Auth screen ---------- */
+  #auth-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .auth-card{
+    width:100%; max-width:380px;
+    background:var(--ink-800); border:1px solid var(--hairline); border-radius:14px;
+    padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  }
+  .auth-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--amber); margin:0 0 8px; }
+  .auth-card h1{ font-family:'Fraunces',serif; font-weight:600; font-size:26px; margin:0 0 6px; }
+  .auth-card p.sub{ color:var(--ink-muted); font-size:13px; margin:0 0 22px; }
+  .auth-field{ margin-bottom:14px; }
+  .auth-field label{ display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:6px; }
+  .auth-field input{
+    width:100%; background:var(--ink-700); border:1px solid var(--hairline); color:var(--paper);
+    font-family:'IBM Plex Sans',sans-serif; font-size:13.5px; padding:11px 12px; border-radius:8px; outline:none;
+  }
+  .auth-field input:focus{ border-color:var(--amber); }
+  #auth-submit{
+    width:100%; background:var(--amber); color:var(--ink-900); border:none; font-family:'IBM Plex Sans',sans-serif;
+    font-weight:600; font-size:13.5px; padding:12px 18px; border-radius:8px; cursor:pointer; margin-top:4px;
+  }
+  #auth-submit:hover{ filter:brightness(1.08); }
+  #auth-submit:disabled{ opacity:0.6; cursor:default; }
+  .auth-error{ color:var(--rust); font-family:'IBM Plex Mono',monospace; font-size:12px; margin:10px 0 0; min-height:14px; }
+  .auth-links{ margin-top:16px; display:flex; justify-content:space-between; font-size:12px; }
+  .auth-links button{ background:none; border:none; color:var(--ink-muted); font-family:'IBM Plex Sans',sans-serif; font-size:12px; cursor:pointer; text-decoration:underline; padding:0; }
+  .auth-links button:hover{ color:var(--amber); }
+  .config-warning{
+    max-width:520px; margin:14px auto 0; background:rgba(193,89,78,0.1); border:1px solid rgba(193,89,78,0.3);
+    border-radius:10px; padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.6; color:var(--paper);
   }
 
   /* ---------- Masthead ---------- */
-  .masthead{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-end;
-    gap:16px;
-    padding-bottom:20px;
-    margin-bottom:22px;
-    border-bottom:1px solid var(--hairline);
-    opacity:0;
-    animation: rise 0.5s ease-out forwards;
-  }
-
-  .mast-eyebrow{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11px;
-    letter-spacing:0.14em;
-    text-transform:uppercase;
-    color:var(--amber);
-    margin:0 0 6px;
-  }
-
-  h1{
-    font-family:'Fraunces', serif;
-    font-weight:600;
-    font-size:clamp(26px, 4vw, 34px);
-    margin:0;
-    letter-spacing:-0.01em;
-  }
-
-  .tagline{
-    margin:6px 0 0;
-    color:var(--ink-muted);
-    font-size:14px;
-    max-width:46ch;
-  }
-
-  .mast-meta{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11px;
-    color:var(--ink-muted);
-    text-align:right;
-    line-height:1.6;
-    white-space:nowrap;
-  }
-
-  .mast-meta .dot{ color:var(--teal); }
+  .masthead{ display:flex; justify-content:space-between; align-items:flex-end; gap:16px; padding-bottom:20px; margin-bottom:22px; border-bottom:1px solid var(--hairline); }
+  .mast-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  h1{ font-family:'Fraunces',serif; font-weight:600; font-size:clamp(26px,4vw,34px); margin:0; letter-spacing:-0.01em; }
+  .tagline{ margin:6px 0 0; color:var(--ink-muted); font-size:14px; max-width:50ch; }
+  .mast-right{ display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .mast-meta{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-muted); text-align:right; line-height:1.6; white-space:nowrap; }
+  #logout-btn{ background:none; border:1px solid var(--hairline); color:var(--ink-muted); font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 10px; border-radius:6px; cursor:pointer; }
+  #logout-btn:hover{ color:var(--rust); border-color:var(--rust); }
 
   /* ---------- Wallet manager ---------- */
-  .wallet-manager{
-    opacity:0;
-    animation: rise 0.5s ease-out 0.08s forwards;
-  }
-
-  #add-wallet-form{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-  }
-
+  #add-wallet-form{ display:flex; gap:8px; flex-wrap:wrap; }
   #add-wallet-form input{
-    background:var(--ink-800);
-    border:1px solid var(--hairline);
-    color:var(--paper);
-    font-family:'IBM Plex Mono', monospace;
-    font-size:13px;
-    padding:11px 12px;
-    border-radius:8px;
-    outline:none;
+    background:var(--ink-800); border:1px solid var(--hairline); color:var(--paper);
+    font-family:'IBM Plex Mono',monospace; font-size:13px; padding:11px 12px; border-radius:8px; outline:none;
   }
   #add-wallet-form input:focus{ border-color:var(--amber); }
   #add-wallet-form input::placeholder{ color:#5c6474; }
-
   #wallet-label{ flex:1 1 220px; min-width:160px; }
   #wallet-address{ flex:2 1 320px; min-width:220px; }
-
   #add-wallet-form button{
-    background:var(--amber);
-    color:var(--ink-900);
-    border:none;
-    font-family:'IBM Plex Sans', sans-serif;
-    font-weight:600;
-    font-size:13px;
-    padding:11px 18px;
-    border-radius:8px;
-    cursor:pointer;
-    transition:transform 0.12s ease, filter 0.12s ease;
+    background:var(--amber); color:var(--ink-900); border:none; font-family:'IBM Plex Sans',sans-serif; font-weight:600;
+    font-size:13px; padding:11px 18px; border-radius:8px; cursor:pointer;
   }
   #add-wallet-form button:hover{ filter:brightness(1.08); }
-  #add-wallet-form button:active{ transform:translateY(1px); }
+  .form-error{ color:var(--rust); font-family:'IBM Plex Mono',monospace; font-size:12px; margin:8px 2px 0; min-height:16px; }
 
-  .form-error{
-    color:var(--rust);
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12px;
-    margin:8px 2px 0;
-    min-height:16px;
-  }
-
-  .wallet-chips{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    margin-top:14px;
-  }
-
+  .wallet-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
   .wallet-chip{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    background:var(--ink-800);
-    border:1px solid var(--hairline);
-    border-radius:999px;
-    padding:7px 8px 7px 14px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12px;
-    color:var(--ink-muted);
-    cursor:pointer;
-    transition:border-color 0.15s ease, color 0.15s ease;
+    display:flex; align-items:center; gap:8px; background:var(--ink-800); border:1px solid var(--hairline);
+    border-radius:999px; padding:7px 8px 7px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px;
+    color:var(--ink-muted); cursor:pointer;
   }
   .wallet-chip:hover{ border-color:rgba(227,162,60,0.4); }
-  .wallet-chip.active{
-    color:var(--paper);
-    border-color:var(--amber);
-    background:rgba(227,162,60,0.08);
-  }
+  .wallet-chip.active{ color:var(--paper); border-color:var(--amber); background:rgba(227,162,60,0.08); }
+  .wallet-swatch{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
   .wallet-chip .chip-label{ color:var(--paper); font-family:'IBM Plex Sans',sans-serif; font-weight:500; }
   .wallet-chip .chip-value{ color:var(--teal); }
-  .wallet-chip .chip-remove{
-    background:none;
-    border:none;
-    color:var(--ink-muted);
-    cursor:pointer;
-    font-size:14px;
-    line-height:1;
-    padding:4px 6px;
-    border-radius:999px;
-  }
+  .wallet-chip .chip-remove{ background:none; border:none; color:var(--ink-muted); cursor:pointer; font-size:14px; line-height:1; padding:4px 6px; border-radius:999px; }
   .wallet-chip .chip-remove:hover{ color:var(--rust); background:rgba(193,89,78,0.12); }
 
-  /* ---------- Board ---------- */
-  .board{
-    margin-top:30px;
-    opacity:0;
-    animation: rise 0.5s ease-out 0.1s forwards;
-  }
-
-  .board-toolbar{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:10px;
-    margin-bottom:18px;
-  }
-
-  .active-address{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:13px;
-  }
-  .active-address #active-label{ color:var(--paper); font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:14px; }
-  .icon-btn{
-    background:none;
-    border:1px solid var(--hairline);
-    color:var(--ink-muted);
-    border-radius:6px;
-    padding:4px 8px;
-    cursor:pointer;
-    font-size:12px;
-  }
-  .icon-btn:hover{ color:var(--amber); border-color:var(--amber); }
-
-  .toolbar-actions{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    flex-wrap:wrap;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12px;
-    color:var(--ink-muted);
-  }
-
-  .auto-refresh{ display:flex; align-items:center; gap:6px; cursor:pointer; }
-  .auto-refresh select{
-    background:var(--ink-800);
-    color:var(--paper);
-    border:1px solid var(--hairline);
-    border-radius:6px;
-    padding:3px 5px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11px;
-  }
-
-  #refresh-btn{
-    background:var(--ink-800);
-    border:1px solid var(--hairline);
-    color:var(--paper);
-    padding:7px 12px;
-    border-radius:7px;
-    cursor:pointer;
-    font-family:'IBM Plex Sans', sans-serif;
-    font-size:12px;
-    font-weight:500;
-  }
-  #refresh-btn:hover{ border-color:var(--amber); }
-  #refresh-btn.spinning{ color:var(--amber); }
-
-  /* ---------- Split-flap stat cards ---------- */
-  .stat-flaps{
-    display:grid;
-    grid-template-columns:repeat(4, 1fr);
-    gap:10px;
-    margin-bottom:32px;
-  }
-
-  .flap-card{
-    background:linear-gradient(180deg, var(--ink-700), var(--ink-800));
-    border:1px solid var(--hairline);
-    border-radius:var(--radius);
-    padding:16px 14px 14px;
-    position:relative;
-    overflow:hidden;
-  }
-  .flap-card::after{
-    content:"";
-    position:absolute;
-    left:0; right:0; top:50%;
-    height:1px;
-    background:rgba(0,0,0,0.35);
-    box-shadow:0 1px 0 rgba(255,255,255,0.04);
-  }
-
-  .flap-label{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:10.5px;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    color:var(--ink-muted);
-    margin-bottom:8px;
-  }
-
-  .flap-value{
-    display:block;
-    font-family:'IBM Plex Mono', monospace;
-    font-weight:600;
-    font-size:clamp(18px, 2.4vw, 24px);
-    letter-spacing:-0.02em;
-    transform-style:preserve-3d;
-    perspective:200px;
-  }
-  .flap-value.pos{ color:var(--teal); }
-  .flap-value.neg{ color:var(--rust); }
-
-  @keyframes flapFlip{
-    0%{ transform:rotateX(0deg); }
-    50%{ transform:rotateX(-90deg); }
-    100%{ transform:rotateX(0deg); }
-  }
-  .flap-flip{ animation:flapFlip 0.4s ease-in-out; }
-
-  /* ---------- Section headers ---------- */
   /* ---------- Tabs ---------- */
-  .tabs{
-    display:flex;
-    gap:22px;
-    margin-bottom:22px;
-    border-bottom:1px solid var(--hairline);
-  }
+  .tabs{ display:flex; gap:22px; margin:30px 0 22px; border-bottom:1px solid var(--hairline); }
   .tab-btn{
-    background:none;
-    border:none;
-    color:var(--ink-muted);
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12px;
-    letter-spacing:0.06em;
-    text-transform:uppercase;
-    padding:10px 2px;
-    cursor:pointer;
-    position:relative;
-    display:flex;
-    align-items:center;
-    gap:8px;
+    background:none; border:none; color:var(--ink-muted); font-family:'IBM Plex Mono',monospace; font-size:12px;
+    letter-spacing:0.06em; text-transform:uppercase; padding:10px 2px; cursor:pointer; position:relative;
   }
-  .tab-btn::after{
-    content:"";
-    position:absolute;
-    left:0; right:0; bottom:-1px;
-    height:2px;
-    background:transparent;
-    transition:background 0.15s ease;
-  }
+  .tab-btn::after{ content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:transparent; }
   .tab-btn:hover{ color:var(--paper); }
   .tab-btn.active{ color:var(--paper); }
   .tab-btn.active::after{ background:var(--amber); }
 
-  .tab-badge{
-    background:var(--ink-700);
-    color:var(--ink-muted);
-    font-family:'IBM Plex Mono', monospace;
-    font-size:10px;
-    padding:1px 7px;
-    border-radius:999px;
-    min-width:16px;
-    text-align:center;
-    transition:background 0.15s ease, color 0.15s ease;
-  }
-  .tab-badge.has-items{ background:var(--amber); color:var(--ink-900); font-weight:600; }
+  /* ---------- Stat cards ---------- */
+  .stat-flaps{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:32px; }
+  .flap-card{ background:linear-gradient(180deg,var(--ink-700),var(--ink-800)); border:1px solid var(--hairline); border-radius:var(--radius); padding:16px 14px 14px; position:relative; overflow:hidden; }
+  .flap-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:8px; }
+  .flap-value{ display:block; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:clamp(18px,2.4vw,24px); letter-spacing:-0.02em; }
+  .flap-value.pos{ color:var(--teal); }
+  .flap-value.neg{ color:var(--rust); }
 
-  .stat-flaps.flaps-3{ grid-template-columns:repeat(3, 1fr); }
+  .section-header{ display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+  .section-header h2{ font-family:'Fraunces',serif; font-weight:600; font-size:18px; margin:0; }
 
-  .flap-error{
-    margin-top:8px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:9.5px;
-    line-height:1.5;
-    color:var(--rust);
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:8px;
-  }
-  .flap-error span{ word-break:break-word; }
-  .flap-error button{
-    background:none;
-    border:1px solid rgba(193,89,78,0.5);
-    color:var(--rust);
-    border-radius:5px;
-    padding:2px 7px;
-    font-size:9.5px;
-    cursor:pointer;
-    flex-shrink:0;
-  }
-  .flap-error button:hover{ background:rgba(193,89,78,0.12); }
-
-  /* ---------- Data table (Tabla tab) ---------- */
-  .table-wrap{
-    overflow-x:auto;
-    border:1px solid var(--hairline);
-    border-radius:var(--radius);
-    margin-bottom:34px;
-  }
-  .data-table{
-    width:100%;
-    border-collapse:collapse;
-    font-size:13px;
-  }
-  .data-table thead th{
-    text-align:left;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:10.5px;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    color:var(--ink-muted);
-    padding:12px 14px;
-    border-bottom:1px solid var(--hairline);
-    white-space:nowrap;
-  }
-  .data-table th.t-num{ text-align:right; }
-  .data-table td{
-    padding:12px 14px;
-    border-bottom:1px solid var(--hairline);
-    color:var(--paper);
-    vertical-align:middle;
-    white-space:nowrap;
-  }
-  .data-table tbody tr:last-child td{ border-bottom:none; }
-  .data-table tbody tr:hover{ background:rgba(227,162,60,0.04); }
-  .data-table td.t-outcome{
-    max-width:340px;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-    font-weight:500;
-  }
-  .data-table td.t-num{
-    text-align:right;
-    font-family:'IBM Plex Mono', monospace;
-  }
-  .data-table td.t-num.pos{ color:var(--teal); font-weight:600; }
-
-  .table-filters{
-    display:flex;
-    flex-wrap:wrap;
-    gap:20px;
-    margin-bottom:14px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12px;
-    color:var(--ink-muted);
-  }
-  .filter-toggle{
-    display:flex;
-    align-items:center;
-    gap:7px;
-    cursor:pointer;
-    user-select:none;
-  }
-  .filter-toggle input{ accent-color:var(--amber); cursor:pointer; }
-
-  .group-row td{
-    background:rgba(227,162,60,0.06);
-    padding:10px 14px;
-    border-bottom:1px solid var(--hairline);
-    white-space:normal;
-  }
-  .group-name{
-    font-family:'Fraunces', serif;
-    font-weight:600;
-    font-size:13.5px;
-    color:var(--paper);
-    margin-right:12px;
-  }
-  .group-meta{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11px;
-    color:var(--ink-muted);
-  }
-  .group-meta .pos{ color:var(--teal); }
-  .group-meta .neg{ color:var(--rust); }
-
-  /* ---------- Órdenes tab: credential form ---------- */
-  .orders-connect{ max-width:600px; }
-  .orders-security-note{
-    background:rgba(227,162,60,0.08);
-    border:1px solid rgba(227,162,60,0.3);
-    border-radius:8px;
-    padding:12px 14px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11.5px;
-    line-height:1.65;
-    color:var(--paper);
-    margin-bottom:18px;
-  }
-  .orders-security-note code{
-    background:var(--ink-800);
-    padding:1px 5px;
-    border-radius:4px;
-  }
-
-  #orders-creds-form{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-  }
-  .orders-field{ display:flex; flex-direction:column; gap:5px; }
-  .orders-field label{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:10px;
-    letter-spacing:0.06em;
-    text-transform:uppercase;
-    color:var(--ink-muted);
-  }
-  .orders-field input{
-    background:var(--ink-800);
-    border:1px solid var(--hairline);
-    color:var(--paper);
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12.5px;
-    padding:9px 10px;
-    border-radius:7px;
-    outline:none;
-  }
-  .orders-field input:focus{ border-color:var(--amber); }
-
-  #orders-connect-btn{
-    grid-column:1 / -1;
-    background:var(--amber);
-    color:var(--ink-900);
-    border:none;
-    font-family:'IBM Plex Sans', sans-serif;
-    font-weight:600;
-    font-size:13px;
-    padding:11px 18px;
-    border-radius:8px;
-    cursor:pointer;
-    margin-top:4px;
-  }
-  #orders-connect-btn:hover{ filter:brightness(1.08); }
-
-  .orders-session-bar{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:16px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12.5px;
-    color:var(--ink-muted);
-  }
-  .orders-session-bar strong{ color:var(--paper); }
-  .data-table td.t-wallet{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11.5px;
-    color:var(--ink-muted);
-  }
-
-  .wallet-tag{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:10px;
-    color:var(--ink-muted);
-    border:1px solid var(--hairline);
-    border-radius:4px;
-    padding:1px 6px;
-  }
-
-  .pos-action{ display:flex; align-items:center; justify-content:flex-end; }
-  .redeem-link{
-    font-family:'IBM Plex Sans', sans-serif;
-    font-size:11.5px;
-    font-weight:600;
-    color:var(--ink-900);
-    background:var(--amber);
-    border-radius:7px;
-    padding:8px 12px;
-    text-decoration:none;
-    white-space:nowrap;
-    transition:filter 0.12s ease;
-  }
-  .redeem-link:hover{ filter:brightness(1.08); }
-
-  .section-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    margin-bottom:12px;
-  }
-  .section-header h2{
-    font-family:'Fraunces', serif;
-    font-weight:600;
-    font-size:18px;
-    margin:0;
-  }
-  .section-header select{
-    background:var(--ink-800);
-    color:var(--paper);
-    border:1px solid var(--hairline);
-    border-radius:7px;
-    padding:6px 8px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11.5px;
-  }
-
-  /* ---------- Positions ---------- */
+  /* ---------- Positions (live) ---------- */
   .positions-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:34px; }
-
-  .position-row{
-    display:grid;
-    grid-template-columns:auto 1fr auto auto auto;
-    align-items:center;
-    gap:14px;
-    background:var(--ink-800);
-    border:1px solid var(--hairline);
-    border-radius:var(--radius);
-    padding:12px 14px;
-    transition:border-color 0.15s ease;
-  }
+  .position-row{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:14px; background:var(--ink-800); border:1px solid var(--hairline); border-radius:var(--radius); padding:12px 14px; }
   .position-row:hover{ border-color:rgba(227,162,60,0.35); }
-
-  .pos-icon{
-    width:34px; height:34px;
-    border-radius:7px;
-    object-fit:cover;
-    background:var(--ink-700);
-    flex-shrink:0;
-  }
-  .pos-icon-fallback{
-    width:34px; height:34px;
-    border-radius:7px;
-    background:var(--ink-700);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-family:'Fraunces',serif;
-    font-weight:600;
-    font-size:14px;
-    color:var(--amber);
-    flex-shrink:0;
-  }
-
+  .pos-icon{ width:34px; height:34px; border-radius:7px; object-fit:cover; background:var(--ink-700); flex-shrink:0; }
+  .pos-icon-fallback{ width:34px; height:34px; border-radius:7px; background:var(--ink-700); display:flex; align-items:center; justify-content:center; font-family:'Fraunces',serif; font-weight:600; font-size:14px; color:var(--amber); flex-shrink:0; }
   .pos-main{ min-width:0; }
-  .pos-title{
-    font-size:13.5px;
-    font-weight:500;
-    color:var(--paper);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    margin-bottom:6px;
-  }
-  .pos-sub{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11px;
-    color:var(--ink-muted);
-  }
-  .outcome-badge{
-    border:1px solid var(--hairline);
-    border-radius:4px;
-    padding:1px 6px;
-    letter-spacing:0.04em;
-  }
+  .pos-title{ font-size:13.5px; font-weight:500; color:var(--paper); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:6px; }
+  .pos-sub{ display:flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-muted); }
+  .outcome-badge{ border:1px solid var(--hairline); border-radius:4px; padding:1px 6px; letter-spacing:0.04em; }
   .outcome-badge.yes{ color:var(--teal); border-color:rgba(90,171,143,0.4); }
   .outcome-badge.no{ color:var(--rust); border-color:rgba(193,89,78,0.4); }
-
-  .prob-bar{
-    margin-top:8px;
-    height:3px;
-    width:100%;
-    max-width:280px;
-    background:var(--ink-700);
-    border-radius:2px;
-    overflow:hidden;
-  }
-  .prob-bar-fill{ height:100%; background:var(--amber); }
-
-  .pos-size{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12.5px;
-    color:var(--ink-muted);
-    text-align:right;
-    white-space:nowrap;
-  }
+  .redeem-badge{ font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-900); background:var(--amber); border-radius:4px; padding:3px 7px; white-space:nowrap; }
+  .pos-size{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-muted); text-align:right; white-space:nowrap; }
   .pos-size .value-line{ color:var(--paper); font-size:13.5px; margin-bottom:2px; }
-
-  .pos-pnl{
-    font-family:'IBM Plex Mono', monospace;
-    text-align:right;
-    white-space:nowrap;
-  }
+  .pos-pnl{ font-family:'IBM Plex Mono',monospace; text-align:right; white-space:nowrap; }
   .pos-pnl .cash{ font-size:13.5px; font-weight:600; margin-bottom:2px; }
   .pos-pnl .pct{ font-size:11px; color:var(--ink-muted); }
   .pos-pnl.pos .cash{ color:var(--teal); }
   .pos-pnl.neg .cash{ color:var(--rust); }
 
-  .redeem-badge{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:10px;
-    letter-spacing:0.05em;
-    text-transform:uppercase;
-    color:var(--ink-900);
-    background:var(--amber);
-    border-radius:4px;
-    padding:3px 7px;
-    white-space:nowrap;
-  }
-
-  /* ---------- Activity ---------- */
   .activity-list{ display:flex; flex-direction:column; }
-  .activity-row{
-    display:grid;
-    grid-template-columns:70px 1fr auto auto;
-    gap:12px;
-    align-items:center;
-    padding:9px 4px;
-    border-bottom:1px solid var(--hairline);
-    font-size:12.5px;
-  }
+  .activity-row{ display:grid; grid-template-columns:70px 1fr auto auto; gap:12px; align-items:center; padding:9px 4px; border-bottom:1px solid var(--hairline); font-size:12.5px; }
   .activity-row:last-child{ border-bottom:none; }
-  .activity-side{
-    font-family:'IBM Plex Mono', monospace;
-    font-weight:600;
-    font-size:11px;
-    letter-spacing:0.05em;
-  }
-  .activity-side.buy{ color:var(--teal); }
-  .activity-side.sell{ color:var(--rust); }
-  .activity-title{
-    color:var(--paper);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
-  .activity-price, .activity-time{
-    font-family:'IBM Plex Mono', monospace;
-    color:var(--ink-muted);
-    white-space:nowrap;
-    text-align:right;
-  }
+  .activity-side{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:11px; letter-spacing:0.05em; }
+  .activity-side.buy{ color:var(--teal); } .activity-side.sell{ color:var(--rust); }
+  .activity-title{ color:var(--paper); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .activity-price,.activity-time{ font-family:'IBM Plex Mono',monospace; color:var(--ink-muted); white-space:nowrap; text-align:right; }
 
-  /* ---------- States ---------- */
-  .empty-state, .empty-app-state{
-    text-align:center;
-    padding:40px 20px;
-    color:var(--ink-muted);
-    font-size:13.5px;
-    border:1px dashed var(--hairline);
-    border-radius:var(--radius);
-  }
+  .empty-state,.empty-app-state{ text-align:center; padding:40px 20px; color:var(--ink-muted); font-size:13.5px; border:1px dashed var(--hairline); border-radius:var(--radius); }
   .empty-app-state{ margin-top:34px; }
+  .inline-error{ display:flex; justify-content:space-between; align-items:center; gap:12px; background:rgba(193,89,78,0.08); border:1px solid rgba(193,89,78,0.3); color:var(--paper); border-radius:8px; padding:12px 14px; font-size:13px; margin-bottom:14px; }
+  .inline-error button{ background:none; border:1px solid rgba(193,89,78,0.5); color:var(--paper); border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px; flex-shrink:0; }
 
-  .inline-error{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    background:rgba(193,89,78,0.08);
-    border:1px solid rgba(193,89,78,0.3);
-    color:var(--paper);
-    border-radius:8px;
-    padding:12px 14px;
-    font-size:13px;
-    margin-bottom:14px;
-  }
-  .inline-error button{
-    background:none;
-    border:1px solid rgba(193,89,78,0.5);
-    color:var(--paper);
-    border-radius:6px;
-    padding:5px 10px;
-    cursor:pointer;
-    font-size:12px;
-    flex-shrink:0;
-  }
+  /* ---------- Histórico ---------- */
+  .hist-controls{ display:flex; flex-wrap:wrap; gap:18px; margin-bottom:20px; }
+  .control-group{ display:flex; flex-direction:column; gap:8px; }
+  .control-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-muted); }
+  .pill-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pill-btn{ background:var(--ink-800); border:1px solid var(--hairline); color:var(--ink-muted); font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 12px; border-radius:999px; cursor:pointer; }
+  .pill-btn:hover{ border-color:var(--amber); color:var(--paper); }
+  .pill-btn.active{ background:var(--amber-soft,rgba(227,162,60,0.12)); border-color:var(--amber); color:var(--paper); font-weight:600; }
+  .wallet-filter{ display:flex; align-items:center; gap:7px; background:var(--ink-800); border:1px solid var(--hairline); border-radius:999px; padding:6px 12px 6px 10px; font-size:12px; color:var(--ink-muted); cursor:pointer; }
+  .wallet-filter.off{ opacity:0.4; }
+  .wallet-filter .wallet-swatch{ width:9px; height:9px; }
 
-  .skeleton-row{
-    height:58px;
-    border-radius:var(--radius);
-    background:linear-gradient(90deg, var(--ink-800) 0%, var(--ink-700) 50%, var(--ink-800) 100%);
-    background-size:200% 100%;
-    animation:shimmer 1.4s ease-in-out infinite;
-    margin-bottom:8px;
+  .chart-card{ background:var(--ink-800); border:1px solid var(--hairline); border-radius:var(--radius); padding:20px 20px 12px; margin-bottom:28px; }
+  .chart-wrap{ position:relative; }
+  #chart-svg{ width:100%; height:260px; display:block; overflow:visible; }
+  .chart-empty{ padding:60px 10px; text-align:center; color:var(--ink-muted); font-size:13px; }
+  .chart-tooltip{
+    position:absolute; pointer-events:none; background:var(--ink-900); border:1px solid var(--hairline);
+    border-radius:8px; padding:8px 10px; font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    line-height:1.6; box-shadow:0 8px 20px rgba(0,0,0,0.4); opacity:0; transform:translateY(-4px);
+    transition:opacity 0.1s ease; white-space:nowrap; z-index:5;
   }
-  @keyframes shimmer{ 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+  .chart-tooltip.show{ opacity:1; }
+  .chart-tooltip .tt-date{ color:var(--ink-muted); margin-bottom:4px; }
+  .chart-tooltip .tt-row{ display:flex; align-items:center; gap:6px; }
+  .chart-tooltip .tt-dot{ width:7px; height:7px; border-radius:50%; }
 
-  @keyframes rise{
-    from{ opacity:0; transform:translateY(6px); }
-    to{ opacity:1; transform:translateY(0); }
-  }
+  .table-wrap{ overflow-x:auto; border:1px solid var(--hairline); border-radius:var(--radius); margin-bottom:20px; }
+  .data-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .data-table thead th{ text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-muted); padding:12px 14px; border-bottom:1px solid var(--hairline); white-space:nowrap; }
+  .data-table th.t-num{ text-align:right; }
+  .data-table td{ padding:12px 14px; border-bottom:1px solid var(--hairline); color:var(--paper); vertical-align:middle; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .data-table tbody tr:last-child td{ border-bottom:none; }
+  .data-table tbody tr:hover{ background:rgba(227,162,60,0.04); }
+  .data-table td.t-num{ text-align:right; font-family:'IBM Plex Mono',monospace; }
+  .data-table td.t-num.pos{ color:var(--teal); font-weight:600; }
+  .data-table td.t-num.neg{ color:var(--rust); font-weight:600; }
+  .data-table td.t-wallet{ display:flex; align-items:center; gap:7px; }
 
-  footer.note{
-    margin-top:40px;
-    color:var(--ink-muted);
-    font-size:11.5px;
-    font-family:'IBM Plex Mono', monospace;
-    line-height:1.7;
-    border-top:1px solid var(--hairline);
-    padding-top:16px;
-  }
+  .export-row{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .btn-outline{ background:var(--ink-800); border:1px solid var(--hairline); color:var(--paper); padding:8px 14px; border-radius:7px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif; font-size:12px; font-weight:500; }
+  .btn-outline:hover{ border-color:var(--amber); }
 
-  /* ---------- Responsive ---------- */
+  footer.note{ margin-top:40px; color:var(--ink-muted); font-size:11.5px; font-family:'IBM Plex Mono',monospace; line-height:1.7; border-top:1px solid var(--hairline); padding-top:16px; }
+
   @media (max-width:640px){
     .stat-flaps{ grid-template-columns:repeat(2,1fr); }
     .position-row{ grid-template-columns:auto 1fr; row-gap:10px; }
-    .pos-size, .pos-pnl, .pos-action{ grid-column:2 / 3; text-align:left; justify-content:flex-start; }
+    .pos-size,.pos-pnl{ grid-column:2/3; text-align:left; }
     .activity-row{ grid-template-columns:50px 1fr; row-gap:4px; }
-    .activity-price, .activity-time{ grid-column:2/3; text-align:left; }
+    .activity-price,.activity-time{ grid-column:2/3; text-align:left; }
     .masthead{ flex-direction:column; align-items:flex-start; }
+    .mast-right{ align-items:flex-start; }
     .mast-meta{ text-align:left; }
-    #orders-creds-form{ grid-template-columns:1fr; }
+  }
+
+  @media print{
+    body{ background:#fff !important; color:#000 !important; }
+    .actionbar,.tabs,.wallet-manager,.masthead,.export-row,#logout-btn,.hist-controls,.no-print{ display:none !important; }
+    .chart-card,.data-table,.table-wrap{ border-color:#ccc !important; background:#fff !important; }
+    * { color:#000 !important; }
   }
 </style>
 </head>
 <body>
-<div class="app">
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <p class="auth-eyebrow">Pulse · acceso de equipo</p>
+    <h1 id="auth-title">Iniciar sesión</h1>
+    <p class="sub">Solo miembros invitados del equipo pueden entrar.</p>
+    <form id="auth-form">
+      <div class="auth-field">
+        <label for="auth-email">Correo</label>
+        <input type="email" id="auth-email" autocomplete="username" required>
+      </div>
+      <div class="auth-field" id="auth-password-field">
+        <label for="auth-password">Contraseña</label>
+        <input type="password" id="auth-password" autocomplete="current-password">
+      </div>
+      <button type="submit" id="auth-submit">Entrar</button>
+      <p class="auth-error" id="auth-error"></p>
+    </form>
+    <div class="auth-links">
+      <button type="button" id="forgot-btn">Olvidé mi contraseña</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
 
   <header class="masthead">
     <div>
-      <p class="mast-eyebrow">Monitor · Polygon mainnet</p>
-      <h1>Tablero de posiciones</h1>
-      <p class="tagline">Lee directamente de la Data API pública de Polymarket, por dirección de wallet — así el portafolio de tu bot se ve aunque no aparezca en la web oficial.</p>
+      <p class="mast-eyebrow">Pulse · Polygon mainnet</p>
+      <h1>Monitor de portafolio</h1>
+      <p class="tagline">Posiciones, historial y alertas del equipo — leído de la Data API de Polymarket y registrado en Supabase.</p>
     </div>
-    <div class="mast-meta" id="clock"></div>
+    <div class="mast-right">
+      <div class="mast-meta" id="clock"></div>
+      <div class="mast-meta" id="user-email"></div>
+      <button id="logout-btn" type="button">Cerrar sesión</button>
+    </div>
   </header>
 
   <section class="wallet-manager">
     <form id="add-wallet-form">
-      <input id="wallet-label" type="text" placeholder="Etiqueta (opcional) — ej. Bot deposit wallet" maxlength="40">
+      <input id="wallet-label" type="text" placeholder="Etiqueta — ej. Bot deposit wallet" maxlength="40">
       <input id="wallet-address" type="text" placeholder="0x… (dirección funder / proxy wallet)" maxlength="42" autocomplete="off" spellcheck="false">
       <button type="submit">Añadir y monitorear</button>
     </form>
@@ -833,1159 +286,660 @@
     <div class="wallet-chips" id="wallet-chips"></div>
   </section>
 
-  <section class="board" id="board" hidden>
-    <div class="board-toolbar">
-      <div class="active-address">
-        <span id="active-label">—</span>
-        <button class="icon-btn" id="copy-address" title="Copiar dirección" type="button">Copiar</button>
-        <a class="icon-btn" id="explorer-link" href="#" target="_blank" rel="noopener">Polygonscan ↗</a>
-      </div>
-      <div class="toolbar-actions">
-        <label class="auto-refresh">
-          <input type="checkbox" id="auto-refresh" checked>
-          Auto
-          <select id="refresh-interval">
-            <option value="15000">15s</option>
-            <option value="30000" selected>30s</option>
-            <option value="60000">60s</option>
-            <option value="120000">2min</option>
-          </select>
-        </label>
-        <button id="refresh-btn" type="button">Actualizar</button>
-        <span id="last-updated">—</span>
-      </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn active" type="button" role="tab" data-tab="live">En vivo</button>
+    <button class="tab-btn" type="button" role="tab" data-tab="historico">Histórico</button>
+    <button class="tab-btn" type="button" role="tab" data-tab="operaciones">Operaciones</button>
+  </nav>
+
+  <!-- ============ TAB: EN VIVO ============ -->
+  <div id="tab-live" role="tabpanel">
+    <div class="empty-app-state" id="empty-app-state">
+      Añade la dirección de tu <strong>funder</strong> — la proxy wallet de tu cuenta de Polymarket — para empezar a monitorear.
     </div>
 
-    <div class="tabs" role="tablist">
-      <button class="tab-btn active" type="button" role="tab" aria-selected="true" data-tab="positions">Posiciones</button>
-      <button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="redeemable">Redimibles <span class="tab-badge" id="redeemable-badge">0</span></button>
-      <button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="table">Tabla <span class="tab-badge" id="table-badge">0</span></button>
-      <button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="orders">Órdenes <span class="tab-badge" id="orders-badge">0</span></button>
-    </div>
-
-    <div id="tab-positions" role="tabpanel">
-      <div class="stat-flaps">
-        <div class="flap-card">
-          <div class="flap-label">Saldo disponible (pUSD)</div>
-          <span class="flap-value" id="stat-balance">—</span>
-          <div class="flap-error" id="balance-error" hidden>
-            <span id="balance-error-text"></span>
-            <button type="button" id="balance-retry">Reintentar</button>
-          </div>
-        </div>
-        <div class="flap-card">
-          <div class="flap-label">Valor total</div>
-          <span class="flap-value" id="stat-value">—</span>
-        </div>
-        <div class="flap-card">
-          <div class="flap-label">P&amp;L (cash)</div>
-          <span class="flap-value" id="stat-pnl">—</span>
-        </div>
-        <div class="flap-card">
-          <div class="flap-label">Posiciones abiertas</div>
-          <span class="flap-value" id="stat-count">—</span>
-        </div>
-        <div class="flap-card">
-          <div class="flap-label">Redimibles</div>
-          <span class="flap-value" id="stat-redeemable">—</span>
-        </div>
-      </div>
-
+    <div id="live-board" hidden>
       <div class="section-header">
-        <h2>Posiciones</h2>
-        <select id="sort-select">
-          <option value="CURRENT">Valor actual</option>
-          <option value="CASHPNL">P&amp;L (cash)</option>
-          <option value="PERCENTPNL">P&amp;L (%)</option>
-          <option value="TITLE">Título</option>
-          <option value="RESOLVING">Vence pronto</option>
-        </select>
+        <h2 id="live-wallet-name">—</h2>
+        <span class="mono" id="live-updated" style="font-size:11px;color:var(--ink-muted);">—</span>
       </div>
-      <div class="inline-error" id="positions-error" hidden>
-        <span id="positions-error-text"></span>
-        <button type="button" id="positions-retry">Reintentar</button>
+
+      <div class="stat-flaps">
+        <div class="flap-card"><div class="flap-label">Saldo disponible (pUSD)</div><span class="flap-value" id="stat-balance">—</span></div>
+        <div class="flap-card"><div class="flap-label">Valor total</div><span class="flap-value" id="stat-value">—</span></div>
+        <div class="flap-card"><div class="flap-label">P&amp;L (cash)</div><span class="flap-value" id="stat-pnl">—</span></div>
+        <div class="flap-card"><div class="flap-label">Posiciones abiertas</div><span class="flap-value" id="stat-count">—</span></div>
       </div>
-      <div class="empty-state" id="positions-empty" hidden>Esta wallet no tiene posiciones abiertas por encima del umbral mínimo.</div>
+
+      <div class="section-header"><h2>Posiciones</h2></div>
+      <div class="inline-error" id="positions-error" hidden><span id="positions-error-text"></span><button type="button" id="positions-retry">Reintentar</button></div>
+      <div class="empty-state" id="positions-empty" hidden>Esta wallet no tiene posiciones abiertas.</div>
       <div id="positions-list" class="positions-list"></div>
 
-      <div class="section-header">
-        <h2>Actividad reciente</h2>
-      </div>
-      <div class="inline-error" id="activity-error" hidden>
-        <span id="activity-error-text"></span>
-        <button type="button" id="activity-retry">Reintentar</button>
-      </div>
+      <div class="section-header"><h2>Actividad reciente</h2></div>
       <div class="empty-state" id="activity-empty" hidden>Sin operaciones recientes para esta wallet.</div>
       <div id="activity-list" class="activity-list"></div>
     </div>
+  </div>
 
-    <div id="tab-redeemable" role="tabpanel" hidden>
-      <div class="stat-flaps flaps-3">
-        <div class="flap-card">
-          <div class="flap-label">Valor total redimible</div>
-          <span class="flap-value pos" id="redeem-stat-value">—</span>
-        </div>
-        <div class="flap-card">
-          <div class="flap-label">Posiciones redimibles</div>
-          <span class="flap-value" id="redeem-stat-count">—</span>
-        </div>
-        <div class="flap-card">
-          <div class="flap-label">Wallets con redimibles</div>
-          <span class="flap-value" id="redeem-stat-wallets">—</span>
+  <!-- ============ TAB: HISTÓRICO ============ -->
+  <div id="tab-historico" role="tabpanel" hidden>
+    <div class="hist-controls">
+      <div class="control-group">
+        <span class="control-label">Rango</span>
+        <div class="pill-row" id="range-pills">
+          <button class="pill-btn" data-range="7">7 días</button>
+          <button class="pill-btn active" data-range="30">30 días</button>
+          <button class="pill-btn" data-range="90">90 días</button>
+          <button class="pill-btn" data-range="0">Todo</button>
         </div>
       </div>
-
-      <div class="section-header">
-        <h2>Redimibles en todas tus wallets</h2>
+      <div class="control-group">
+        <span class="control-label">Métrica</span>
+        <div class="pill-row" id="metric-pills">
+          <button class="pill-btn active" data-metric="pnl">P&amp;L</button>
+          <button class="pill-btn" data-metric="value">Valor total</button>
+        </div>
       </div>
-      <div class="inline-error" id="redeem-error" hidden>
-        <span id="redeem-error-text"></span>
-        <button type="button" id="redeem-retry">Reintentar</button>
-      </div>
-      <div class="empty-state" id="redeem-empty" hidden>No hay posiciones redimibles en las wallets que monitoreas ahora mismo.</div>
-      <div id="redeem-list" class="positions-list"></div>
-    </div>
-
-    <div id="tab-table" role="tabpanel" hidden>
-      <div class="section-header">
-        <h2>Todas las posiciones</h2>
-        <button class="icon-btn" id="table-copy" type="button" title="Copiar tabla al portapapeles">⧉ Copiar tabla</button>
-      </div>
-      <div class="table-filters">
-        <label class="filter-toggle"><input type="checkbox" id="filter-positive-pnl"> Solo P&amp;L positivo</label>
-        <label class="filter-toggle"><input type="checkbox" id="filter-group-event"> Agrupar por evento</label>
-      </div>
-      <div class="inline-error" id="table-error" hidden>
-        <span id="table-error-text"></span>
-        <button type="button" id="table-retry">Reintentar</button>
-      </div>
-      <div class="empty-state" id="table-empty" hidden>No hay posiciones abiertas en las wallets que monitoreas.</div>
-      <div class="table-wrap">
-        <table class="data-table" id="positions-table">
-          <thead>
-            <tr>
-              <th>Outcome</th>
-              <th>Posición</th>
-              <th class="t-num">Cantidad</th>
-              <th class="t-num">Precio promedio</th>
-              <th class="t-num">Inversión</th>
-              <th class="t-num">Pago si ocurre</th>
-              <th>Wallet</th>
-            </tr>
-          </thead>
-          <tbody id="table-body"></tbody>
-        </table>
+      <div class="control-group" style="flex:1;">
+        <span class="control-label">Wallets</span>
+        <div class="pill-row" id="wallet-filters"></div>
       </div>
     </div>
 
-    <div id="tab-orders" role="tabpanel" hidden>
-      <div id="orders-connect" class="orders-connect">
-        <div class="orders-security-note">
-          🔒 Estas credenciales quedan <strong>solo en la memoria de esta pestaña del navegador</strong> — nunca se guardan (ni con <code>window.storage</code>, ni en disco), nunca se envían a ningún servidor salvo <code>clob.polymarket.com</code> directamente, y se borran automáticamente si recargas la página o presionas "Desconectar". No es tu private key: son las credenciales de API (key / secret / passphrase) que ya generó tu bot al conectarse al CLOB.
-        </div>
-        <form id="orders-creds-form">
-          <div class="orders-field">
-            <label for="orders-signer">Dirección firmante (POLY_ADDRESS)</label>
-            <input type="text" id="orders-signer" placeholder="0x… — tu EOA, no la funder wallet" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="orders-field">
-            <label for="orders-apikey">API Key</label>
-            <input type="text" id="orders-apikey" placeholder="uuid" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="orders-field">
-            <label for="orders-secret">Secret</label>
-            <input type="password" id="orders-secret" placeholder="base64…" autocomplete="new-password" spellcheck="false">
-          </div>
-          <div class="orders-field">
-            <label for="orders-passphrase">Passphrase</label>
-            <input type="password" id="orders-passphrase" placeholder="passphrase" autocomplete="new-password" spellcheck="false">
-          </div>
-          <button type="submit" id="orders-connect-btn">Conectar</button>
-        </form>
-        <p class="form-error" id="orders-connect-error"></p>
-      </div>
-
-      <div id="orders-connected" hidden>
-        <div class="orders-session-bar">
-          <span>Conectado como <strong id="orders-signer-label"></strong></span>
-          <button class="icon-btn" id="orders-disconnect" type="button">Desconectar</button>
-        </div>
-        <div class="inline-error" id="orders-error" hidden>
-          <span id="orders-error-text"></span>
-          <button type="button" id="orders-retry">Reintentar</button>
-        </div>
-        <div class="empty-state" id="orders-empty" hidden>No tienes órdenes abiertas en este momento.</div>
-        <div id="orders-list" class="positions-list"></div>
+    <div class="chart-card">
+      <div class="chart-wrap">
+        <svg id="chart-svg" viewBox="0 0 800 260" preserveAspectRatio="none"></svg>
+        <div class="chart-tooltip" id="chart-tooltip"></div>
+        <div class="chart-empty" id="chart-empty" hidden>Todavía no hay historial suficiente — el registro corre cada minuto una vez que la base de datos esté conectada.</div>
       </div>
     </div>
-  </section>
 
-  <section class="empty-app-state" id="empty-app-state">
-    Añade la dirección de tu <strong>funder</strong> — la proxy wallet o deposit wallet de tu cuenta de Polymarket — para empezar a monitorear el portafolio que crea tu bot.
-  </section>
+    <div class="section-header"><h2>Comparación (último corte)</h2></div>
+    <div class="export-row">
+      <button class="btn-outline" id="export-compare-csv">Exportar CSV</button>
+      <button class="btn-outline" id="export-hist-pdf">Exportar PDF</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="compare-table">
+        <thead><tr><th>Wallet</th><th class="t-num">Valor actual</th><th class="t-num">P&amp;L</th><th class="t-num">Posiciones</th><th>Actualizado</th></tr></thead>
+        <tbody id="compare-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ TAB: OPERACIONES ============ -->
+  <div id="tab-operaciones" role="tabpanel" hidden>
+    <div class="section-header">
+      <h2>Registro de operaciones</h2>
+    </div>
+    <div class="export-row">
+      <button class="btn-outline" id="export-trades-csv">Exportar CSV</button>
+      <button class="btn-outline" id="export-trades-pdf">Exportar PDF</button>
+    </div>
+    <div class="empty-state" id="trades-empty" hidden>Sin operaciones registradas todavía.</div>
+    <div class="table-wrap">
+      <table class="data-table" id="trades-table">
+        <thead><tr><th>Fecha</th><th>Wallet</th><th>Lado</th><th>Mercado</th><th>Outcome</th><th class="t-num">Precio</th><th class="t-num">Monto</th></tr></thead>
+        <tbody id="trades-tbody"></tbody>
+      </table>
+    </div>
+  </div>
 
   <footer class="note">
-    Datos vía data-api.polymarket.com (lectura pública, sin API key) y RPC público de Polygon (para el saldo de pUSD, el token de colateral desde la migración a CLOB V2). Esta página no firma ni envía órdenes — solo lee posiciones, valor, actividad y saldo on-chain de la dirección indicada. Las wallets guardadas se recuerdan solo en este navegador/artefacto.
+    Datos vía data-api.polymarket.com y RPC público de Polygon. Solo lectura — esta página nunca firma ni envía órdenes.
+    Historial y alertas registrados por el poller de Supabase (corre cada minuto).
   </footer>
-
 </div>
 
-<script>
+<script type="module">
+// ============================================================================
+// CONFIGURACIÓN — reemplaza estos dos valores con los de tu proyecto Supabase
+// (Project Settings → API). El anon key es público por diseño: se protege
+// con las políticas RLS del esquema, no ocultándolo.
+// ============================================================================
+const CONFIG = {
+  SUPABASE_URL: "https://lepcnuxvkfqpdiswabuh.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlcGNudXh2a2ZxcGRpc3dhYnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2ODQ5MTMsImV4cCI6MjEwMzI2MDkxM30.CG1bUY-fwyJwBa70MeJebptmv2VIUZWacPd1MhU1DS8",
+};
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 (function(){
-  "use strict";
+"use strict";
 
-  const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
-  const STORAGE_KEY = "wallets";
-  const DATA_BASE = "https://data-api.polymarket.com";
+// ---------- resolve config (allows a local override without editing the file) ----------
+let cfg = { ...CONFIG };
+try{
+  const override = JSON.parse(localStorage.getItem("pulse-config") || "null");
+  if (override && override.SUPABASE_URL && override.SUPABASE_ANON_KEY) cfg = override;
+}catch(e){ /* ignore */ }
 
-  // Polymarket USD (pUSD) — the collateral token used as trading buying power since
-  // the CLOB V2 migration (28 abr 2026). Standard ERC-20 on Polygon, 1:1 backed by USDC.
-  const PUSD_ADDRESS = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB";
-  const RPC_ENDPOINTS = [
-    "https://polygon-rpc.com",
-    "https://polygon-bor-rpc.publicnode.com",
-    "https://polygon.gateway.tenderly.co",
-    "https://polygon.drpc.org",
-    "https://rpc.ankr.com/polygon",
-    "https://1rpc.io/matic"
-  ];
+if (cfg.SUPABASE_URL.startsWith("REPLACE_WITH")){
+  document.getElementById("auth-screen").insertAdjacentHTML("beforeend",
+    `<div class="config-warning">⚠ Este monitor todavía no está conectado a Supabase.<br>
+     Pega tu Project URL y anon key en la consola del navegador:<br>
+     <code>localStorage.setItem('pulse-config', JSON.stringify({SUPABASE_URL:'...', SUPABASE_ANON_KEY:'...'})); location.reload()</code><br>
+     o edítalos directamente en el &lt;script&gt; del archivo. Ver SETUP.md.</div>`);
+  throw new Error("Pulse: Supabase no configurado — ver SETUP.md");
+}
 
-  let wallets = [];          // [{label, address}]
-  let activeAddress = null;
-  let autoTimer = null;
-  let loadToken = 0;         // guards against out-of-order responses
-  let currentTab = "positions"; // "positions" | "redeemable" | "table"
-  let lastTableCombined = [];    // raw aggregated positions from the last fetch (unfiltered)
-  let lastClipboardText = "";    // built alongside whatever is currently rendered (flat or grouped)
-  let tableFilterPositivePnl = false;
-  let tableGroupByEvent = false;
-  let ordersCreds = null; // { address, apiKey, secret, passphrase } — memory only, never persisted, cleared on disconnect/reload
+const supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-  // ---------- storage (falls back to memory outside the artifact host) ----------
-  const memoryFallback = { wallets: [] };
-  async function loadWallets(){
-    try{
-      if (window.storage){
-        const res = await window.storage.get(STORAGE_KEY, false);
-        return res && res.value ? JSON.parse(res.value) : [];
-      }
-    }catch(e){ /* key not found or storage unavailable */ }
-    return memoryFallback.wallets;
-  }
-  async function saveWallets(list){
-    memoryFallback.wallets = list;
-    try{
-      if (window.storage){
-        await window.storage.set(STORAGE_KEY, JSON.stringify(list), false);
-      }
-    }catch(e){ console.warn("No se pudo persistir la lista de wallets:", e); }
-  }
+const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+const DATA_BASE = "https://data-api.polymarket.com";
+const PUSD_ADDRESS = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB";
+const RPC_ENDPOINTS = [
+  "https://polygon-rpc.com","https://polygon-bor-rpc.publicnode.com",
+  "https://polygon.gateway.tenderly.co","https://polygon.drpc.org",
+  "https://rpc.ankr.com/polygon","https://1rpc.io/matic"
+];
+const CHART_COLORS = ["#3987e5","#d95926","#199e70","#c98500","#d55181","#3aa63a","#9085e9","#e66767"];
 
-  // ---------- formatting ----------
-  const usd = (n) => {
-    if (n === null || n === undefined || isNaN(n)) return "—";
-    const sign = n < 0 ? "-" : "";
-    return sign + "$" + Math.abs(n).toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
-  };
-  const usdSigned = (n) => (n > 0 ? "+" : "") + usd(n);
-  const pctSigned = (n) => {
-    if (n === null || n === undefined || isNaN(n)) return "—";
-    return (n > 0 ? "+" : "") + n.toFixed(1) + "%";
-  };
-  const shortAddr = (a) => a ? a.slice(0,6) + "…" + a.slice(-4) : "";
-  const initials = (title) => (title || "?").trim().slice(0,2).toUpperCase();
+let wallets = [];             // [{id,label,address,color}]
+let activeAddress = null;
+let autoTimer = null;
+let currentTab = "live";
+let histRange = 30;
+let histMetric = "pnl";
+let walletFilterOn = new Set();  // wallet ids currently shown in chart/compare
 
-  function timeAgo(ts){
-    const s = Math.floor(Date.now()/1000) - ts;
-    if (s < 60) return s + "s";
-    if (s < 3600) return Math.floor(s/60) + "m";
-    if (s < 86400) return Math.floor(s/3600) + "h";
-    return Math.floor(s/86400) + "d";
-  }
+// ============================================================================
+// formatting helpers
+// ============================================================================
+const usd = (n) => { if (n===null||n===undefined||isNaN(n)) return "—"; const s=n<0?"-":""; return s+"$"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); };
+const usdSigned = (n) => (n>0?"+":"")+usd(n);
+const pctSigned = (n) => { if (n===null||n===undefined||isNaN(n)) return "—"; return (n>0?"+":"")+n.toFixed(1)+"%"; };
+const shortAddr = (a) => a ? a.slice(0,6)+"…"+a.slice(-4) : "";
+const initials = (t) => (t||"?").trim().slice(0,2).toUpperCase();
+const escapeHtml = (s) => { const d=document.createElement("div"); d.textContent=s; return d.innerHTML; };
+function timeAgo(ts){ const s=Math.floor(Date.now()/1000)-ts; if(s<60) return s+"s"; if(s<3600) return Math.floor(s/60)+"m"; if(s<86400) return Math.floor(s/3600)+"h"; return Math.floor(s/86400)+"d"; }
+function fmtDate(iso){ return new Date(iso).toLocaleDateString("es-BO",{day:"2-digit",month:"short"}); }
+function fmtDateTime(iso){ return new Date(iso).toLocaleString("es-BO",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}); }
 
-  function setFlap(el, text, cls){
-    if (el.textContent === text && !cls) return;
-    el.classList.remove("pos","neg");
-    if (cls) el.classList.add(cls);
-    el.classList.add("flap-flip");
-    setTimeout(() => { el.textContent = text; }, 150);
-    el.addEventListener("animationend", () => el.classList.remove("flap-flip"), {once:true});
-  }
+// ============================================================================
+// AUTH
+// ============================================================================
+const authScreen = document.getElementById("auth-screen");
+const appEl = document.getElementById("app");
+const authForm = document.getElementById("auth-form");
+const authError = document.getElementById("auth-error");
+const authSubmit = document.getElementById("auth-submit");
 
-  // ---------- data-api calls ----------
-  async function fetchJSON(url){
-    const res = await fetch(url, { headers: { "Accept":"application/json" } });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return res.json();
-  }
+authForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  authError.textContent = "";
+  authSubmit.disabled = true;
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  authSubmit.disabled = false;
+  if (error) authError.textContent = "No se pudo entrar — revisa tu correo y contraseña.";
+});
 
-  async function fetchPositions(address, sortBy){
-    const url = `${DATA_BASE}/positions?user=${address}&limit=500&sortBy=${encodeURIComponent(sortBy)}&sortDirection=DESC`;
-    return fetchJSON(url);
-  }
-  async function fetchValue(address){
-    const url = `${DATA_BASE}/value?user=${address}`;
-    const data = await fetchJSON(url);
-    return Array.isArray(data) && data[0] ? data[0].value : null;
-  }
-  async function fetchActivity(address){
-    const url = `${DATA_BASE}/activity?user=${address}&limit=15&type=TRADE`;
-    return fetchJSON(url);
-  }
+document.getElementById("forgot-btn").addEventListener("click", async () => {
+  const email = document.getElementById("auth-email").value.trim();
+  if (!ADDRESS_RE.test(email) && !email.includes("@")){ authError.textContent = "Escribe tu correo arriba primero."; return; }
+  authError.textContent = "";
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  authError.textContent = error ? "No se pudo enviar el correo." : "Te enviamos un enlace para restablecer tu contraseña.";
+});
 
-  // ---------- CLOB L2 auth (open orders) — credentials never leave the browser except to clob.polymarket.com ----------
-  const CLOB_BASE = "https://clob.polymarket.com";
+document.getElementById("logout-btn").addEventListener("click", () => supabase.auth.signOut());
 
-  function base64ToBytes(b64){
-    // secrets sometimes arrive as base64url instead of standard base64 — normalize first
-    const normalized = b64.trim().replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized + "===".slice((normalized.length + 3) % 4);
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
-
-  function bytesToBase64Url(bytes){
-    let binary = "";
-    bytes.forEach(b => { binary += String.fromCharCode(b); });
-    // urlsafeBase64WithPadding: swap chars for URL-safety but KEEP the '=' padding
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_");
-  }
-
-  async function buildL2Headers(creds, method, path){
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const message = timestamp + method + path; // per docs.polymarket.com/api-reference/authentication
-    const keyBytes = base64ToBytes(creds.secret);
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-    );
-    const sigBuffer = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(message));
-    const signature = bytesToBase64Url(new Uint8Array(sigBuffer));
-    return {
-      "POLY_ADDRESS": creds.address,
-      "POLY_SIGNATURE": signature,
-      "POLY_TIMESTAMP": timestamp,
-      "POLY_API_KEY": creds.apiKey,
-      "POLY_PASSPHRASE": creds.passphrase
-    };
-  }
-
-  async function fetchOpenOrders(creds){
-    const path = "/data/orders";
-    const headers = await buildL2Headers(creds, "GET", path);
-    const res = await fetch(CLOB_BASE + path, { headers });
-    if (res.status === 401 || res.status === 403){
-      throw new Error(`Credenciales rechazadas (HTTP ${res.status}) — revisa API key, secret, passphrase y la dirección firmante.`);
-    }
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const json = await res.json();
-    return Array.isArray(json.data) ? json.data : [];
-  }
-
-  // ---------- on-chain pUSD balance (available buying power) ----------
-  async function ethCall(to, data){
-    const body = JSON.stringify({ jsonrpc:"2.0", id:1, method:"eth_call", params:[{ to, data }, "latest"] });
-    const errors = [];
-    for (const endpoint of RPC_ENDPOINTS){
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6000);
-      try{
-        const res = await fetch(endpoint, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body,
-          signal: controller.signal
-        });
-        clearTimeout(timer);
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const json = await res.json();
-        if (json.error) throw new Error(json.error.message || "error RPC");
-        if (!json.result) throw new Error("sin resultado");
-        return json.result;
-      }catch(e){
-        clearTimeout(timer);
-        const reason = e.name === "AbortError" ? "timeout (6s)" : e.message;
-        let host;
-        try{ host = new URL(endpoint).hostname; }catch(_e){ host = endpoint; }
-        errors.push(`${host}: ${reason}`);
-      }
-    }
-    throw new Error("Todos los RPC de Polygon fallaron — " + errors.join(" · "));
-  }
-
-  let pusdDecimals = null;
-  async function getPusdDecimals(){
-    if (pusdDecimals !== null) return pusdDecimals;
-    try{
-      const hex = await ethCall(PUSD_ADDRESS, "0x313ce567"); // decimals()
-      const parsed = parseInt(hex, 16);
-      pusdDecimals = (Number.isFinite(parsed) && parsed > 0 && parsed <= 36) ? parsed : 6;
-    }catch(e){
-      pusdDecimals = 6; // stablecoin fallback if the call fails
-    }
-    return pusdDecimals;
-  }
-
-  async function fetchPusdBalance(address){
-    const decimals = await getPusdDecimals();
-    const data = "0x70a08231" + address.toLowerCase().replace(/^0x/, "").padStart(64, "0"); // balanceOf(address)
-    const hex = await ethCall(PUSD_ADDRESS, data);
-    const raw = BigInt(hex === "0x" ? "0x0" : hex);
-    return Number(raw) / Math.pow(10, decimals);
-  }
-
-  // ---------- wallet chips ----------
-  function renderChips(){
-    const wrap = document.getElementById("wallet-chips");
-    wrap.innerHTML = "";
-    wallets.forEach((w) => {
-      const chip = document.createElement("div");
-      chip.className = "wallet-chip" + (w.address === activeAddress ? " active" : "");
-      chip.innerHTML = `
-        <span class="chip-label">${w.label ? escapeHtml(w.label) : shortAddr(w.address)}</span>
-        <span class="chip-value" data-chip-value="${w.address}">…</span>
-        <button class="chip-remove" type="button" title="Quitar">✕</button>
-      `;
-      chip.addEventListener("click", (e) => {
-        if (e.target.closest(".chip-remove")) return;
-        setActive(w.address);
-      });
-      chip.querySelector(".chip-remove").addEventListener("click", () => removeWallet(w.address));
-      wrap.appendChild(chip);
-    });
-  }
-
-  function escapeHtml(s){
-    const d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
-  }
-
-  async function refreshChipValue(address){
-    try{
-      const v = await fetchValue(address);
-      const el = document.querySelector(`[data-chip-value="${address}"]`);
-      if (el) el.textContent = v === null ? "—" : usd(v);
-    }catch(e){
-      const el = document.querySelector(`[data-chip-value="${address}"]`);
-      if (el) el.textContent = "err";
-    }
-  }
-
-  function refreshAllChipValues(){
-    wallets.forEach(w => refreshChipValue(w.address));
-  }
-
-  // ---------- add / remove wallets ----------
-  document.getElementById("add-wallet-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const labelInput = document.getElementById("wallet-label");
-    const addrInput = document.getElementById("wallet-address");
-    const errorEl = document.getElementById("form-error");
-    const address = addrInput.value.trim();
-    const label = labelInput.value.trim();
-
-    if (!ADDRESS_RE.test(address)){
-      errorEl.textContent = "Dirección inválida — debe ser 0x seguido de 40 caracteres hexadecimales.";
-      return;
-    }
-    if (wallets.some(w => w.address.toLowerCase() === address.toLowerCase())){
-      errorEl.textContent = "Esa wallet ya está en tu lista.";
-      return;
-    }
-    errorEl.textContent = "";
-    wallets.push({ label, address });
-    await saveWallets(wallets);
-    labelInput.value = "";
-    addrInput.value = "";
-    renderChips();
-    refreshChipValue(address);
-    refreshAggregateTabs(currentTab === "positions" ? null : currentTab);
-    setActive(address);
-  });
-
-  async function removeWallet(address){
-    wallets = wallets.filter(w => w.address !== address);
-    await saveWallets(wallets);
-    renderChips();
-    refreshAggregateTabs(currentTab === "positions" ? null : currentTab);
-    if (activeAddress === address){
-      activeAddress = wallets.length ? wallets[0].address : null;
-      if (activeAddress) setActive(activeAddress);
-      else showEmptyAppState();
-    }
-  }
-
-  function showEmptyAppState(){
-    document.getElementById("board").hidden = true;
-    document.getElementById("empty-app-state").hidden = false;
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (session){
+    authScreen.hidden = true;
+    appEl.hidden = false;
+    document.getElementById("user-email").textContent = session.user.email;
+    boot();
+  } else {
+    authScreen.hidden = false;
+    appEl.hidden = true;
     stopAutoRefresh();
   }
+});
 
-  // ---------- active wallet ----------
-  function setActive(address){
-    activeAddress = address;
-    renderChips();
-    const w = wallets.find(x => x.address === address);
-    document.getElementById("active-label").textContent = w && w.label ? w.label : shortAddr(address);
-    document.getElementById("explorer-link").href = `https://polygonscan.com/address/${address}`;
-    document.getElementById("board").hidden = false;
-    document.getElementById("empty-app-state").hidden = true;
-    loadAll();
-    restartAutoRefresh();
+// ============================================================================
+// clock
+// ============================================================================
+function tickClock(){
+  document.getElementById("clock").textContent = new Date().toLocaleString("es-BO",{ weekday:"short", hour:"2-digit", minute:"2-digit", second:"2-digit" });
+}
+setInterval(tickClock, 1000); tickClock();
+
+// ============================================================================
+// WALLETS (Supabase — compartidas por todo el equipo)
+// ============================================================================
+async function loadWallets(){
+  const { data, error } = await supabase.from("wallets").select("id,label,address").eq("active", true).order("created_at");
+  if (error){ console.error(error); return; }
+  wallets = (data||[]).map((w, i) => ({ ...w, color: CHART_COLORS[i % CHART_COLORS.length] }));
+  if (!walletFilterOn.size) wallets.forEach(w => walletFilterOn.add(w.id));
+  renderChips();
+  renderWalletFilters();
+  if (!activeAddress && wallets.length) setActive(wallets[0].address);
+  if (!wallets.length) showEmptyAppState();
+}
+
+document.getElementById("add-wallet-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const labelInput = document.getElementById("wallet-label");
+  const addrInput = document.getElementById("wallet-address");
+  const errorEl = document.getElementById("form-error");
+  const address = addrInput.value.trim();
+  const label = labelInput.value.trim();
+  if (!ADDRESS_RE.test(address)){ errorEl.textContent = "Dirección inválida — debe ser 0x seguido de 40 caracteres hexadecimales."; return; }
+  if (wallets.some(w => w.address.toLowerCase() === address.toLowerCase())){ errorEl.textContent = "Esa wallet ya está en la lista del equipo."; return; }
+  errorEl.textContent = "";
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from("wallets").insert({ label, address, added_by: user?.id || null });
+  if (error){ errorEl.textContent = "No se pudo guardar — " + error.message; return; }
+  labelInput.value = ""; addrInput.value = "";
+  await loadWallets();
+  setActive(address);
+});
+
+async function removeWallet(id, address){
+  await supabase.from("wallets").update({ active:false }).eq("id", id);
+  await loadWallets();
+  if (activeAddress === address){
+    activeAddress = wallets.length ? wallets[0].address : null;
+    if (activeAddress) setActive(activeAddress); else showEmptyAppState();
   }
+}
 
-  document.getElementById("copy-address").addEventListener("click", () => {
-    if (!activeAddress) return;
-    navigator.clipboard.writeText(activeAddress).then(() => {
-      const btn = document.getElementById("copy-address");
-      const original = btn.textContent;
-      btn.textContent = "Copiado";
-      setTimeout(() => { btn.textContent = original; }, 1200);
-    }).catch(() => {});
+function renderChips(){
+  const wrap = document.getElementById("wallet-chips");
+  wrap.innerHTML = "";
+  wallets.forEach(w => {
+    const chip = document.createElement("div");
+    chip.className = "wallet-chip" + (w.address === activeAddress ? " active" : "");
+    chip.innerHTML = `<span class="wallet-swatch" style="background:${w.color}"></span>
+      <span class="chip-label">${w.label ? escapeHtml(w.label) : shortAddr(w.address)}</span>
+      <button class="chip-remove" type="button" title="Quitar">✕</button>`;
+    chip.addEventListener("click", (e) => { if (e.target.closest(".chip-remove")) return; setActive(w.address); });
+    chip.querySelector(".chip-remove").addEventListener("click", () => removeWallet(w.id, w.address));
+    wrap.appendChild(chip);
   });
+}
 
-  // ---------- rendering: positions ----------
-  function renderPositions(positions){
-    const list = document.getElementById("positions-list");
-    const empty = document.getElementById("positions-empty");
-    list.innerHTML = "";
+function showEmptyAppState(){
+  document.getElementById("empty-app-state").hidden = false;
+  document.getElementById("live-board").hidden = true;
+  stopAutoRefresh();
+}
 
-    if (!positions.length){
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-
-    positions.forEach(p => {
-      const row = document.createElement("div");
-      row.className = "position-row";
-
-      const pnlCls = p.cashPnl > 0 ? "pos" : (p.cashPnl < 0 ? "neg" : "");
-      const probPct = Math.max(0, Math.min(100, (p.curPrice || 0) * 100));
-      const iconHtml = p.icon
-        ? `<img class="pos-icon" src="${p.icon}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pos-icon-fallback',textContent:'${initials(p.title)}'}))">`
-        : `<div class="pos-icon-fallback">${initials(p.title)}</div>`;
-
-      row.innerHTML = `
-        ${iconHtml}
-        <div class="pos-main">
-          <div class="pos-title" title="${escapeHtml(p.title || "")}">${escapeHtml(p.title || "Mercado sin título")}</div>
-          <div class="pos-sub">
-            <span class="outcome-badge ${p.outcome === "Yes" ? "yes" : "no"}">${escapeHtml(p.outcome || "?")}</span>
-            <span>precio ${ (p.curPrice ?? 0).toFixed(3) }</span>
-            ${p.redeemable ? '<span class="redeem-badge">Redimible</span>' : ""}
-          </div>
-          <div class="prob-bar"><div class="prob-bar-fill" style="width:${probPct}%"></div></div>
-        </div>
-        <div class="pos-size">
-          <div class="value-line">${usd(p.currentValue)}</div>
-          <div>${(p.size||0).toLocaleString("en-US",{maximumFractionDigits:2})} sh · avg ${(p.avgPrice??0).toFixed(3)}</div>
-        </div>
-        <div class="pos-pnl ${pnlCls}">
-          <div class="cash">${usdSigned(p.cashPnl)}</div>
-          <div class="pct">${pctSigned(p.percentPnl)}</div>
-        </div>
-      `;
-      list.appendChild(row);
-    });
-  }
-
-  // ---------- rendering: activity ----------
-  function renderActivity(items){
-    const list = document.getElementById("activity-list");
-    const empty = document.getElementById("activity-empty");
-    list.innerHTML = "";
-
-    if (!items.length){
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-
-    items.forEach(a => {
-      const row = document.createElement("div");
-      row.className = "activity-row";
-      row.innerHTML = `
-        <span class="activity-side ${a.side === "BUY" ? "buy" : "sell"}">${a.side === "BUY" ? "COMPRA" : "VENTA"}</span>
-        <span class="activity-title" title="${escapeHtml(a.title || "")}">${escapeHtml(a.title || "")} · ${escapeHtml(a.outcome || "")}</span>
-        <span class="activity-price">${(a.price ?? 0).toFixed(3)} · ${usd(a.usdcSize)}</span>
-        <span class="activity-time">hace ${timeAgo(a.timestamp)}</span>
-      `;
-      list.appendChild(row);
-    });
-  }
-
-  // ---------- aggregated positions across all wallets (feeds Redimibles + Tabla) ----------
-  function updateRedeemBadge(count){
-    const badge = document.getElementById("redeemable-badge");
-    badge.textContent = String(count);
-    badge.classList.toggle("has-items", count > 0);
-  }
-
-  function updateTableBadge(count){
-    const badge = document.getElementById("table-badge");
-    badge.textContent = String(count);
-    badge.classList.toggle("has-items", count > 0);
-  }
-
-  function renderRedeemSection(combined, failCount){
-    const totalValue = combined.reduce((s,p) => s + (p.currentValue || 0), 0);
-    const walletsInvolved = new Set(combined.map(p => p._wallet.address)).size;
-
-    document.getElementById("redeem-stat-value").textContent = usd(totalValue);
-    document.getElementById("redeem-stat-count").textContent = String(combined.length);
-    document.getElementById("redeem-stat-wallets").textContent = String(walletsInvolved);
-
-    const errorBox = document.getElementById("redeem-error");
-    if (failCount > 0){
-      document.getElementById("redeem-error-text").textContent =
-        `No se pudieron consultar ${failCount} de ${wallets.length} wallet(s). Los datos mostrados pueden estar incompletos.`;
-      errorBox.hidden = false;
-    } else {
-      errorBox.hidden = true;
-    }
-
-    const list = document.getElementById("redeem-list");
-    const empty = document.getElementById("redeem-empty");
-    list.innerHTML = "";
-
-    if (!combined.length){
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-
-    combined
-      .slice()
-      .sort((a,b) => (b.currentValue||0) - (a.currentValue||0))
-      .forEach(p => {
-        const row = document.createElement("div");
-        row.className = "position-row";
-        const iconHtml = p.icon
-          ? `<img class="pos-icon" src="${p.icon}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pos-icon-fallback',textContent:'${initials(p.title)}'}))">`
-          : `<div class="pos-icon-fallback">${initials(p.title)}</div>`;
-        const marketUrl = p.eventSlug
-          ? `https://polymarket.com/event/${p.eventSlug}`
-          : (p.slug ? `https://polymarket.com/market/${p.slug}` : "https://polymarket.com/portfolio");
-        const walletLabel = p._wallet.label ? escapeHtml(p._wallet.label) : shortAddr(p._wallet.address);
-
-        row.innerHTML = `
-          ${iconHtml}
-          <div class="pos-main">
-            <div class="pos-title" title="${escapeHtml(p.title || "")}">${escapeHtml(p.title || "Mercado sin título")}</div>
-            <div class="pos-sub">
-              <span class="outcome-badge ${p.outcome === "Yes" ? "yes" : "no"}">${escapeHtml(p.outcome || "?")}</span>
-              <span class="wallet-tag">${walletLabel}</span>
-            </div>
-          </div>
-          <div class="pos-size">
-            <div class="value-line">${usd(p.currentValue)}</div>
-            <div>${(p.size||0).toLocaleString("en-US",{maximumFractionDigits:2})} sh</div>
-          </div>
-          <div class="pos-action">
-            <a class="redeem-link" href="${marketUrl}" target="_blank" rel="noopener">Redimir ↗</a>
-          </div>
-        `;
-        list.appendChild(row);
-      });
-  }
-
-  function buildRowCells(p){
-    const invested = p.initialValue ?? ((p.avgPrice || 0) * (p.size || 0));
-    const payoutIfWins = p.size || 0; // 1 winning share redeems for $1
-    const posClass = p.outcome === "Yes" ? "yes" : "no";
-    const walletLabel = p._wallet.label ? escapeHtml(p._wallet.label) : shortAddr(p._wallet.address);
-    const html = `
-      <td class="t-outcome" title="${escapeHtml(p.title || "")}">${escapeHtml(p.title || "Mercado sin título")}</td>
-      <td><span class="outcome-badge ${posClass}">${p.outcome === "Yes" ? "YES" : "NO"}</span></td>
-      <td class="t-num">${(p.size||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>
-      <td class="t-num">${(p.avgPrice??0).toFixed(3)}</td>
-      <td class="t-num">${usd(invested)}</td>
-      <td class="t-num pos">${usd(payoutIfWins)}</td>
-      <td class="t-wallet">${walletLabel}</td>
-    `;
-    const tsv = `${p.title || "Mercado sin título"}\t${p.outcome === "Yes" ? "YES" : "NO"}\t${p.size||0}\t${(p.avgPrice||0).toFixed(3)}\t${invested.toFixed(2)}\t${payoutIfWins.toFixed(2)}\t${walletLabel}`;
-    return { html, tsv };
-  }
-
-  function eventLabelFor(position){
-    if (!position.eventSlug) return "Otros mercados";
-    return position.eventSlug
-      .split("-")
-      .filter(Boolean)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-  }
-
-  const TSV_HEADER = "Outcome\tPosición\tCantidad\tPrecio promedio\tInversión\tPago si ocurre\tWallet";
-
-  function renderFlatRows(rows){
-    const tbody = document.getElementById("table-body");
-    const clipLines = [TSV_HEADER];
-    rows
-      .slice()
-      .sort((a,b) => (b.currentValue||0) - (a.currentValue||0))
-      .forEach(p => {
-        const { html, tsv } = buildRowCells(p);
-        const tr = document.createElement("tr");
-        tr.innerHTML = html;
-        tbody.appendChild(tr);
-        clipLines.push(tsv);
-      });
-    lastClipboardText = clipLines.join("\n");
-  }
-
-  function renderGroupedRows(rows){
-    const tbody = document.getElementById("table-body");
-    const groups = new Map();
-    rows.forEach(p => {
-      const key = p.eventSlug || `__ungrouped_${p.slug || p.conditionId || p.title}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(p);
-    });
-
-    const groupEntries = Array.from(groups.values()).map(positions => ({
-      positions,
-      label: eventLabelFor(positions[0]),
-      totalInvested: positions.reduce((s,p) => s + (p.initialValue ?? ((p.avgPrice||0)*(p.size||0))), 0),
-      totalValue: positions.reduce((s,p) => s + (p.currentValue||0), 0),
-      totalPnl: positions.reduce((s,p) => s + (p.cashPnl||0), 0)
-    })).sort((a,b) => b.totalValue - a.totalValue);
-
-    const clipLines = [TSV_HEADER];
-
-    groupEntries.forEach(group => {
-      const pnlClass = group.totalPnl > 0 ? "pos" : (group.totalPnl < 0 ? "neg" : "");
-      const groupTr = document.createElement("tr");
-      groupTr.className = "group-row";
-      groupTr.innerHTML = `
-        <td colspan="7">
-          <span class="group-name">${escapeHtml(group.label)}</span>
-          <span class="group-meta">${group.positions.length} posición${group.positions.length===1?"":"es"} · invertido ${usd(group.totalInvested)} · valor ${usd(group.totalValue)} · <span class="${pnlClass}">P&amp;L ${usdSigned(group.totalPnl)}</span></span>
-        </td>
-      `;
-      tbody.appendChild(groupTr);
-      clipLines.push(`\n${group.label} (${group.positions.length} posiciones)`);
-
-      group.positions
-        .slice()
-        .sort((a,b) => (b.currentValue||0) - (a.currentValue||0))
-        .forEach(p => {
-          const { html, tsv } = buildRowCells(p);
-          const tr = document.createElement("tr");
-          tr.innerHTML = html;
-          tbody.appendChild(tr);
-          clipLines.push(tsv);
-        });
-    });
-
-    lastClipboardText = clipLines.join("\n");
-  }
-
-  function renderTableRows(){
-    const tbody = document.getElementById("table-body");
-    const empty = document.getElementById("table-empty");
-    tbody.innerHTML = "";
-
-    let rows = lastTableCombined.slice();
-    if (tableFilterPositivePnl) rows = rows.filter(p => (p.cashPnl||0) > 0);
-
-    if (!rows.length){
-      empty.hidden = false;
-      empty.textContent = (tableFilterPositivePnl && lastTableCombined.length)
-        ? "Ninguna posición tiene P&L positivo en este momento."
-        : "No hay posiciones abiertas en las wallets que monitoreas.";
-      lastClipboardText = "";
-      return;
-    }
-    empty.hidden = true;
-
-    if (tableGroupByEvent) renderGroupedRows(rows);
-    else renderFlatRows(rows);
-  }
-
-  function renderTableSection(combined, failCount){
-    const errorBox = document.getElementById("table-error");
-    if (failCount > 0){
-      document.getElementById("table-error-text").textContent =
-        `No se pudieron consultar ${failCount} de ${wallets.length} wallet(s). La tabla puede estar incompleta.`;
-      errorBox.hidden = false;
-    } else {
-      errorBox.hidden = true;
-    }
-
-    renderTableRows();
-  }
-
-  document.getElementById("filter-positive-pnl").addEventListener("change", (e) => {
-    tableFilterPositivePnl = e.target.checked;
-    renderTableRows();
+// ============================================================================
+// TABS
+// ============================================================================
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentTab = btn.dataset.tab;
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
+    ["live","historico","operaciones"].forEach(t => document.getElementById("tab-"+t).hidden = (t !== currentTab));
+    if (currentTab === "historico") loadHistorico();
+    if (currentTab === "operaciones") loadOperaciones();
   });
-  document.getElementById("filter-group-event").addEventListener("change", (e) => {
-    tableGroupByEvent = e.target.checked;
-    renderTableRows();
-  });
+});
 
-  document.getElementById("table-copy").addEventListener("click", () => {
-    if (!lastClipboardText) return;
-    navigator.clipboard.writeText(lastClipboardText).then(() => {
-      const btn = document.getElementById("table-copy");
-      const original = btn.textContent;
-      btn.textContent = "Copiado ✓";
-      setTimeout(() => { btn.textContent = original; }, 1200);
-    }).catch(() => {});
-  });
+// ============================================================================
+// EN VIVO — lectura directa del navegador (igual que v1, sin backend)
+// ============================================================================
+async function fetchJSON(url){ const res = await fetch(url,{headers:{Accept:"application/json"}}); if(!res.ok) throw new Error("HTTP "+res.status); return res.json(); }
+async function fetchPositions(address){ return fetchJSON(`${DATA_BASE}/positions?user=${address}&limit=500&sortBy=CURRENT&sortDirection=DESC`); }
+async function fetchValue(address){ const d = await fetchJSON(`${DATA_BASE}/value?user=${address}`); return Array.isArray(d)&&d[0]?d[0].value:null; }
+async function fetchActivity(address){ return fetchJSON(`${DATA_BASE}/activity?user=${address}&limit=15&type=TRADE`); }
 
-  async function fetchAggregateAllWallets(){
-    if (!wallets.length) return { combined:[], failCount:0 };
-    const results = await Promise.all(wallets.map(w =>
-      fetchPositions(w.address, "CURRENT")
-        .then(positions => ({ wallet:w, positions, error:null }))
-        .catch(err => ({ wallet:w, positions:[], error:err }))
-    ));
-    const combined = [];
-    let failCount = 0;
-    results.forEach(r => {
-      if (r.error) failCount++;
-      r.positions.forEach(p => combined.push(Object.assign({}, p, { _wallet:r.wallet })));
-    });
-    return { combined, failCount };
-  }
-
-  // renderTab: null (badges only) | "redeemable" | "table"
-  async function refreshAggregateTabs(renderTab){
-    if (renderTab) document.getElementById("refresh-btn").classList.add("spinning");
-
-    const { combined, failCount } = await fetchAggregateAllWallets();
-    lastTableCombined = combined;
-    const redeemable = combined.filter(p => p.redeemable);
-
-    updateRedeemBadge(redeemable.length);
-    updateTableBadge(combined.length);
-
-    if (renderTab === "redeemable") renderRedeemSection(redeemable, failCount);
-    if (renderTab === "table") renderTableSection(combined, failCount);
-
-    if (renderTab){
-      document.getElementById("last-updated").textContent = "Actualizado " + new Date().toLocaleTimeString("es-BO");
-      document.getElementById("refresh-btn").classList.remove("spinning");
-    }
-  }
-
-  // ---------- rendering + lifecycle: open orders ----------
-  function updateOrdersBadge(count){
-    const badge = document.getElementById("orders-badge");
-    badge.textContent = String(count);
-    badge.classList.toggle("has-items", count > 0);
-  }
-
-  function resolveOrderTitle(o){
-    // Best-effort: cross-reference against positions we already fetched (Tabla/Redimibles aggregate).
-    // A brand-new order with no matching position yet won't resolve — falls back to a short market id.
-    const match = lastTableCombined.find(p => p.asset === o.asset_id);
-    return match ? match.title : null;
-  }
-
-  function renderOrders(orders){
-    const list = document.getElementById("orders-list");
-    const empty = document.getElementById("orders-empty");
-    list.innerHTML = "";
-
-    if (!orders.length){
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-
-    orders
-      .slice()
-      .sort((a,b) => (b.created_at||0) - (a.created_at||0))
-      .forEach(o => {
-        const size = parseFloat(o.original_size || "0") / 1e6;
-        const matched = parseFloat(o.size_matched || "0") / 1e6;
-        const remaining = Math.max(0, size - matched);
-        const title = resolveOrderTitle(o);
-        const fallbackLabel = o.market ? `Mercado ${shortAddr(o.market)}` : "Mercado desconocido";
-        const displayTitle = title || fallbackLabel;
-
-        const row = document.createElement("div");
-        row.className = "position-row";
-        row.innerHTML = `
-          <div class="pos-icon-fallback">${initials(displayTitle)}</div>
-          <div class="pos-main">
-            <div class="pos-title" title="${escapeHtml(o.market || "")}">${escapeHtml(displayTitle)}</div>
-            <div class="pos-sub">
-              <span class="outcome-badge ${o.side === "BUY" ? "yes" : "no"}">${escapeHtml(o.side || "")}</span>
-              <span class="outcome-badge ${o.outcome === "YES" ? "yes" : "no"}">${escapeHtml(o.outcome || "")}</span>
-              <span class="wallet-tag">${escapeHtml(o.order_type || "")}</span>
-              <span class="wallet-tag">hace ${timeAgo(o.created_at)}</span>
-            </div>
-          </div>
-          <div class="pos-size">
-            <div class="value-line">precio ${(parseFloat(o.price)||0).toFixed(3)}</div>
-            <div>${remaining.toLocaleString("en-US",{maximumFractionDigits:2})} / ${size.toLocaleString("en-US",{maximumFractionDigits:2})} sh</div>
-          </div>
-        `;
-        list.appendChild(row);
-      });
-  }
-
-  async function loadOpenOrders(){
-    if (!ordersCreds) return;
-    const errEl = document.getElementById("orders-error");
-    errEl.hidden = true;
-    document.getElementById("refresh-btn").classList.add("spinning");
+async function ethCall(to, data){
+  const body = JSON.stringify({ jsonrpc:"2.0", id:1, method:"eth_call", params:[{to,data},"latest"] });
+  const errors = [];
+  for (const endpoint of RPC_ENDPOINTS){
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 6000);
     try{
-      const orders = await fetchOpenOrders(ordersCreds);
-      const live = orders.filter(o => !o.status || o.status === "ORDER_STATUS_LIVE");
-      updateOrdersBadge(live.length);
-      renderOrders(live);
-      document.getElementById("last-updated").textContent = "Actualizado " + new Date().toLocaleTimeString("es-BO");
-    }catch(e){
-      document.getElementById("orders-error-text").textContent = e.message;
-      errEl.hidden = false;
-      updateOrdersBadge(0);
-    }finally{
-      document.getElementById("refresh-btn").classList.remove("spinning");
-    }
+      const res = await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body,signal:controller.signal});
+      clearTimeout(timer);
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const json = await res.json();
+      if(json.error) throw new Error(json.error.message||"error RPC");
+      if(!json.result) throw new Error("sin resultado");
+      return json.result;
+    }catch(e){ clearTimeout(timer); errors.push(e.message); }
   }
+  throw new Error("Todos los RPC de Polygon fallaron — "+errors.join(" · "));
+}
+let pusdDecimals = null;
+async function getPusdDecimals(){ if(pusdDecimals!==null) return pusdDecimals; try{ const hex=await ethCall(PUSD_ADDRESS,"0x313ce567"); const p=parseInt(hex,16); pusdDecimals=(Number.isFinite(p)&&p>0&&p<=36)?p:6; }catch(e){ pusdDecimals=6; } return pusdDecimals; }
+async function fetchPusdBalance(address){ const decimals=await getPusdDecimals(); const data="0x70a08231"+address.toLowerCase().replace(/^0x/,"").padStart(64,"0"); const hex=await ethCall(PUSD_ADDRESS,data); const raw=BigInt(hex==="0x"?"0x0":hex); return Number(raw)/Math.pow(10,decimals); }
 
-  document.getElementById("orders-creds-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const errorEl = document.getElementById("orders-connect-error");
+let loadToken = 0;
+function setActive(address){
+  activeAddress = address;
+  renderChips();
+  const w = wallets.find(x => x.address === address);
+  document.getElementById("live-wallet-name").textContent = w && w.label ? w.label : shortAddr(address);
+  document.getElementById("empty-app-state").hidden = true;
+  document.getElementById("live-board").hidden = false;
+  loadLive();
+  restartAutoRefresh();
+}
 
-    if (!(window.crypto && window.crypto.subtle)){
-      errorEl.textContent = "Este navegador no expone Web Crypto en este contexto (falta un origen seguro / https). Prueba dentro de Claude.ai o sirviendo el archivo por https.";
-      return;
-    }
-
-    const address = document.getElementById("orders-signer").value.trim();
-    const apiKey = document.getElementById("orders-apikey").value.trim();
-    const secret = document.getElementById("orders-secret").value.trim();
-    const passphrase = document.getElementById("orders-passphrase").value.trim();
-
-    if (!ADDRESS_RE.test(address)){
-      errorEl.textContent = "Dirección firmante inválida (debe ser 0x + 40 hex).";
-      return;
-    }
-    if (!apiKey || !secret || !passphrase){
-      errorEl.textContent = "Completa API key, secret y passphrase.";
-      return;
-    }
-    errorEl.textContent = "";
-
-    ordersCreds = { address, apiKey, secret, passphrase };
-
-    // wipe the sensitive values out of the DOM immediately — they now live only in the ordersCreds variable
-    document.getElementById("orders-apikey").value = "";
-    document.getElementById("orders-secret").value = "";
-    document.getElementById("orders-passphrase").value = "";
-
-    document.getElementById("orders-signer-label").textContent = shortAddr(address);
-    document.getElementById("orders-connect").hidden = true;
-    document.getElementById("orders-connected").hidden = false;
-    updateToolbarForTab(currentTab);
-
-    loadOpenOrders();
-  });
-
-  document.getElementById("orders-disconnect").addEventListener("click", () => {
-    ordersCreds = null;
-    document.getElementById("orders-signer").value = "";
-    document.getElementById("orders-connected").hidden = true;
-    document.getElementById("orders-connect").hidden = false;
-    document.getElementById("orders-list").innerHTML = "";
-    updateOrdersBadge(0);
-    if (currentTab === "orders") updateToolbarForTab(currentTab);
-  });
-
-  document.getElementById("orders-retry").addEventListener("click", () => loadOpenOrders());
-
-  // ---------- tabs ----------
-  function updateToolbarForTab(tab){
-    const copyBtn = document.getElementById("copy-address");
-    const explorerLink = document.getElementById("explorer-link");
-    const label = document.getElementById("active-label");
-    if (tab === "positions"){
-      copyBtn.style.display = "";
-      explorerLink.style.display = "";
-      const w = wallets.find(x => x.address === activeAddress);
-      label.textContent = w && w.label ? w.label : shortAddr(activeAddress);
-      return;
-    }
-    copyBtn.style.display = "none";
-    explorerLink.style.display = "none";
-    if (tab === "orders"){
-      label.textContent = ordersCreds ? ("Sesión API — " + shortAddr(ordersCreds.address)) : "Órdenes abiertas (requiere conectar)";
-    } else {
-      label.textContent = "Todas las wallets guardadas";
-    }
-  }
-
-  function setTab(tab){
-    currentTab = tab;
-    document.querySelectorAll(".tab-btn").forEach(b => {
-      const isActive = b.dataset.tab === tab;
-      b.classList.toggle("active", isActive);
-      b.setAttribute("aria-selected", isActive ? "true" : "false");
-    });
-    document.getElementById("tab-positions").hidden = tab !== "positions";
-    document.getElementById("tab-redeemable").hidden = tab !== "redeemable";
-    document.getElementById("tab-table").hidden = tab !== "table";
-    document.getElementById("tab-orders").hidden = tab !== "orders";
-    updateToolbarForTab(tab);
-    refreshCurrent();
-  }
-
-  document.querySelectorAll(".tab-btn").forEach(b => {
-    b.addEventListener("click", () => setTab(b.dataset.tab));
-  });
-
-  document.getElementById("redeem-retry").addEventListener("click", () => refreshAggregateTabs("redeemable"));
-  document.getElementById("table-retry").addEventListener("click", () => refreshAggregateTabs("table"));
-
-  function refreshCurrent(){
-    if (currentTab === "positions"){
-      loadAll();
-      refreshAggregateTabs(null);
-    } else if (currentTab === "orders"){
-      if (ordersCreds) loadOpenOrders();
-    } else {
-      refreshAggregateTabs(currentTab);
-    }
-  }
-
-  // ---------- balance (independent lifecycle, never blocks the rest of the panel) ----------
-  async function loadBalance(address, token){
-    const balanceEl = document.getElementById("stat-balance");
-    const errEl = document.getElementById("balance-error");
-    try{
-      const val = await fetchPusdBalance(address);
-      if (token !== loadToken) return; // a newer load superseded this one
-      setFlap(balanceEl, usd(val));
-      balanceEl.title = "";
-      errEl.hidden = true;
-    }catch(e){
-      if (token !== loadToken) return;
-      setFlap(balanceEl, "—");
-      balanceEl.title = e.message;
-      document.getElementById("balance-error-text").textContent = e.message;
-      errEl.hidden = false;
-    }
-  }
-
-  document.getElementById("balance-retry").addEventListener("click", () => {
-    if (activeAddress) loadBalance(activeAddress, loadToken);
-  });
-
-  // ---------- load cycle ----------
-  async function loadAll(){
-    if (!activeAddress) return;
-    const token = ++loadToken;
-    const address = activeAddress;
-    const sortBy = document.getElementById("sort-select").value;
-
-    document.getElementById("refresh-btn").classList.add("spinning");
-    document.getElementById("positions-error").hidden = true;
-    document.getElementById("activity-error").hidden = true;
-
-    loadBalance(address, token); // independent lifecycle — never blocks positions/activity below
-
-    const results = await Promise.allSettled([
-      fetchPositions(address, sortBy),
-      fetchValue(address),
-      fetchActivity(address)
+async function loadLive(){
+  const token = ++loadToken;
+  const address = activeAddress;
+  if (!address) return;
+  try{
+    const [positions, value, activity, balance] = await Promise.all([
+      fetchPositions(address).catch(()=>[]),
+      fetchValue(address).catch(()=>null),
+      fetchActivity(address).catch(()=>[]),
+      fetchPusdBalance(address).catch(()=>null),
     ]);
+    if (token !== loadToken) return;
+    renderPositions(positions);
+    renderActivity(activity);
+    const totalPnl = positions.reduce((s,p)=>s+(p.cashPnl||0),0);
+    document.getElementById("stat-balance").textContent = balance===null?"—":usd(balance);
+    document.getElementById("stat-value").textContent = usd(value);
+    const pnlEl = document.getElementById("stat-pnl");
+    pnlEl.textContent = usdSigned(totalPnl);
+    pnlEl.classList.toggle("pos", totalPnl>0); pnlEl.classList.toggle("neg", totalPnl<0);
+    document.getElementById("stat-count").textContent = String(positions.length);
+    document.getElementById("live-updated").textContent = "Actualizado " + new Date().toLocaleTimeString("es-BO");
+  }catch(e){ console.error(e); }
+}
 
-    if (token !== loadToken) return; // a newer load superseded this one
+function renderPositions(positions){
+  const list = document.getElementById("positions-list");
+  const empty = document.getElementById("positions-empty");
+  list.innerHTML = "";
+  if (!positions.length){ empty.hidden = false; return; }
+  empty.hidden = true;
+  positions.forEach(p => {
+    const row = document.createElement("div");
+    row.className = "position-row";
+    const pnlCls = p.cashPnl>0?"pos":(p.cashPnl<0?"neg":"");
+    const iconHtml = p.icon
+      ? `<img class="pos-icon" src="${p.icon}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pos-icon-fallback',textContent:'${initials(p.title)}'}))">`
+      : `<div class="pos-icon-fallback">${initials(p.title)}</div>`;
+    row.innerHTML = `
+      ${iconHtml}
+      <div class="pos-main">
+        <div class="pos-title" title="${escapeHtml(p.title||"")}">${escapeHtml(p.title||"Mercado sin título")}</div>
+        <div class="pos-sub">
+          <span class="outcome-badge ${p.outcome==="Yes"?"yes":"no"}">${escapeHtml(p.outcome||"?")}</span>
+          <span>precio ${(p.curPrice??0).toFixed(3)}</span>
+          ${p.redeemable?'<span class="redeem-badge">Redimible</span>':""}
+        </div>
+      </div>
+      <div class="pos-size">
+        <div class="value-line">${usd(p.currentValue)}</div>
+        <div>${(p.size||0).toLocaleString("en-US",{maximumFractionDigits:2})} sh</div>
+      </div>
+      <div class="pos-pnl ${pnlCls}">
+        <div class="cash">${usdSigned(p.cashPnl)}</div>
+        <div class="pct">${pctSigned(p.percentPnl)}</div>
+      </div>`;
+    list.appendChild(row);
+  });
+}
 
-    const [posResult, valResult, actResult] = results;
+function renderActivity(items){
+  const list = document.getElementById("activity-list");
+  const empty = document.getElementById("activity-empty");
+  list.innerHTML = "";
+  if (!items.length){ empty.hidden = false; return; }
+  empty.hidden = true;
+  items.forEach(a => {
+    const row = document.createElement("div");
+    row.className = "activity-row";
+    row.innerHTML = `<span class="activity-side ${a.side==="BUY"?"buy":"sell"}">${a.side==="BUY"?"COMPRA":"VENTA"}</span>
+      <span class="activity-title" title="${escapeHtml(a.title||"")}">${escapeHtml(a.title||"")} · ${escapeHtml(a.outcome||"")}</span>
+      <span class="activity-price">${(a.price??0).toFixed(3)} · ${usd(a.usdcSize)}</span>
+      <span class="activity-time">hace ${timeAgo(a.timestamp)}</span>`;
+    list.appendChild(row);
+  });
+}
 
-    // Positions + derived stats
-    let positions = [];
-    if (posResult.status === "fulfilled"){
-      positions = posResult.value;
-      renderPositions(positions);
-    } else {
-      document.getElementById("positions-error-text").textContent =
-        "No se pudieron cargar las posiciones (" + posResult.reason.message + "). Puede ser una dirección sin actividad, o un problema de red/CORS.";
-      document.getElementById("positions-error").hidden = false;
-      document.getElementById("positions-list").innerHTML = "";
-      document.getElementById("positions-empty").hidden = true;
+document.getElementById("positions-retry").addEventListener("click", loadLive);
+
+function restartAutoRefresh(){ stopAutoRefresh(); autoTimer = setInterval(loadLive, 30000); }
+function stopAutoRefresh(){ if (autoTimer){ clearInterval(autoTimer); autoTimer = null; } }
+
+// ============================================================================
+// HISTÓRICO — desde Supabase (wallet_daily_totals / wallet_latest_totals)
+// ============================================================================
+document.getElementById("range-pills").addEventListener("click", (e) => {
+  const btn = e.target.closest(".pill-btn"); if (!btn) return;
+  document.querySelectorAll("#range-pills .pill-btn").forEach(b=>b.classList.toggle("active", b===btn));
+  histRange = Number(btn.dataset.range);
+  loadHistorico();
+});
+document.getElementById("metric-pills").addEventListener("click", (e) => {
+  const btn = e.target.closest(".pill-btn"); if (!btn) return;
+  document.querySelectorAll("#metric-pills .pill-btn").forEach(b=>b.classList.toggle("active", b===btn));
+  histMetric = btn.dataset.metric;
+  loadHistorico();
+});
+
+function renderWalletFilters(){
+  const wrap = document.getElementById("wallet-filters");
+  wrap.innerHTML = "";
+  wallets.forEach(w => {
+    const on = walletFilterOn.has(w.id);
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "wallet-filter" + (on ? "" : " off");
+    el.innerHTML = `<span class="wallet-swatch" style="background:${w.color}"></span>${escapeHtml(w.label||shortAddr(w.address))}`;
+    el.addEventListener("click", () => {
+      if (walletFilterOn.has(w.id)) walletFilterOn.delete(w.id); else walletFilterOn.add(w.id);
+      renderWalletFilters();
+      loadHistorico();
+    });
+    wrap.appendChild(el);
+  });
+}
+
+let lastCompareRows = [];
+async function loadHistorico(){
+  if (!wallets.length) return;
+  const ids = wallets.filter(w => walletFilterOn.has(w.id)).map(w => w.id);
+
+  // ---- comparación (último corte, todas las wallets) ----
+  const { data: latest, error: latestErr } = await supabase.from("wallet_latest_totals").select("*");
+  if (!latestErr && latest){
+    lastCompareRows = latest.map(r => {
+      const w = wallets.find(x => x.id === r.wallet_id);
+      return { ...r, label: w ? (w.label||shortAddr(w.address)) : r.wallet_id, color: w?.color || "#8891a3" };
+    });
+    renderCompareTable(lastCompareRows);
+  }
+
+  // ---- serie histórica ----
+  let query = supabase.from("wallet_daily_totals").select("*");
+  if (histRange > 0){
+    const since = new Date(Date.now() - histRange*86400000).toISOString();
+    query = query.gte("day", since);
+  }
+  if (ids.length) query = query.in("wallet_id", ids);
+  const { data: rows, error } = await query.order("day");
+  if (error){ console.error(error); return; }
+  renderChart(rows || []);
+}
+
+function renderCompareTable(rows){
+  const tbody = document.getElementById("compare-tbody");
+  tbody.innerHTML = "";
+  if (!rows.length){
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--ink-muted);">Todavía no hay snapshots — corre en cuanto el poller de Supabase esté activo.</td></tr>`;
+    return;
+  }
+  rows.sort((a,b) => (b.total_value||0) - (a.total_value||0));
+  rows.forEach(r => {
+    const pnlCls = r.total_cash_pnl>0?"pos":(r.total_cash_pnl<0?"neg":"");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="t-wallet"><span class="wallet-swatch" style="background:${r.color}"></span>${escapeHtml(r.label)}</td>
+      <td class="t-num">${usd(r.total_value)}</td>
+      <td class="t-num ${pnlCls}">${usdSigned(r.total_cash_pnl)}</td>
+      <td class="t-num">${r.open_positions}</td>
+      <td>${fmtDateTime(r.captured_at)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderChart(rows){
+  const svg = document.getElementById("chart-svg");
+  const emptyEl = document.getElementById("chart-empty");
+  svg.innerHTML = "";
+  if (!rows.length){ emptyEl.hidden = false; return; }
+  emptyEl.hidden = true;
+
+  const byWallet = {};
+  rows.forEach(r => { (byWallet[r.wallet_id] ||= []).push(r); });
+
+  const metricKey = histMetric === "pnl" ? "total_cash_pnl" : "total_value";
+  const allDays = [...new Set(rows.map(r => r.day))].sort();
+  const allVals = rows.map(r => r[metricKey]||0);
+  let yMin = Math.min(0, ...allVals), yMax = Math.max(0, ...allVals);
+  if (yMin === yMax){ yMin -= 1; yMax += 1; }
+  const pad = (yMax - yMin) * 0.1;
+  yMin -= pad; yMax += pad;
+
+  const W = 800, H = 260, ML = 54, MR = 10, MT = 14, MB = 24;
+  const plotW = W - ML - MR, plotH = H - MT - MB;
+  const xFor = (i) => ML + (allDays.length<=1 ? plotW/2 : (i/(allDays.length-1)) * plotW);
+  const yFor = (v) => MT + plotH - ((v-yMin)/(yMax-yMin))*plotH;
+
+  const ns = "http://www.w3.org/2000/svg";
+  function el(tag, attrs){ const e=document.createElementNS(ns,tag); Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v)); return e; }
+
+  // gridlines (recessive) + y labels
+  const gridSteps = 4;
+  for (let i=0;i<=gridSteps;i++){
+    const v = yMin + (yMax-yMin)*(i/gridSteps);
+    const y = yFor(v);
+    svg.appendChild(el("line",{x1:ML,x2:W-MR,y1:y,y2:y,stroke:"rgba(236,230,216,0.08)","stroke-width":1}));
+    const label = el("text",{x:6,y:y+3,fill:"#8891a3","font-size":9,"font-family":"IBM Plex Mono, monospace"});
+    label.textContent = (histMetric==="pnl"?usdSigned(v):usd(v)).replace(".00","");
+    svg.appendChild(label);
+  }
+  // zero line emphasized if range crosses zero
+  if (yMin < 0 && yMax > 0){
+    const y0 = yFor(0);
+    svg.appendChild(el("line",{x1:ML,x2:W-MR,y1:y0,y2:y0,stroke:"rgba(236,230,216,0.28)","stroke-width":1,"stroke-dasharray":"3,3"}));
+  }
+
+  // one line per wallet (color = entity, fixed by wallet, not by filter order)
+  const seriesForTooltip = [];
+  wallets.filter(w => walletFilterOn.has(w.id)).forEach(w => {
+    const pts = byWallet[w.id] || [];
+    if (!pts.length) return;
+    const byDay = {}; pts.forEach(p => byDay[p.day] = p);
+    const coords = allDays.map((d,i) => byDay[d] ? [xFor(i), yFor(byDay[d][metricKey]||0)] : null).filter(Boolean);
+    if (coords.length < 1) return;
+    if (coords.length > 1){
+      const path = coords.map((c,i)=> (i===0?"M":"L")+c[0].toFixed(1)+","+c[1].toFixed(1)).join(" ");
+      svg.appendChild(el("path",{d:path, fill:"none", stroke:w.color, "stroke-width":2, "stroke-linecap":"round", "stroke-linejoin":"round"}));
     }
+    const last = coords[coords.length-1];
+    svg.appendChild(el("circle",{cx:last[0], cy:last[1], r:4, fill:w.color, stroke:"var(--ink-800)", "stroke-width":2}));
+    seriesForTooltip.push({ wallet:w, byDay });
+  });
 
-    const totalCashPnl = positions.reduce((s,p) => s + (p.cashPnl || 0), 0);
-    const redeemableCount = positions.filter(p => p.redeemable).length;
+  // hover crosshair + tooltip
+  const tooltip = document.getElementById("chart-tooltip");
+  const hoverLine = el("line",{x1:0,x2:0,y1:MT,y2:MT+plotH,stroke:"rgba(236,230,216,0.35)","stroke-width":1,visibility:"hidden"});
+  svg.appendChild(hoverLine);
+  const capture = el("rect",{x:ML,y:MT,width:plotW,height:plotH,fill:"transparent"});
+  capture.addEventListener("mousemove", (e) => {
+    const rect = svg.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const mx = (e.clientX - rect.left) * scaleX;
+    let idx = Math.round(((mx - ML) / plotW) * (allDays.length-1));
+    idx = Math.max(0, Math.min(allDays.length-1, idx));
+    const day = allDays[idx];
+    hoverLine.setAttribute("x1", xFor(idx)); hoverLine.setAttribute("x2", xFor(idx)); hoverLine.setAttribute("visibility","visible");
+    let html = `<div class="tt-date">${fmtDate(day)}</div>`;
+    seriesForTooltip.forEach(s => {
+      const row = s.byDay[day];
+      if (!row) return;
+      html += `<div class="tt-row"><span class="tt-dot" style="background:${s.wallet.color}"></span>${escapeHtml(s.wallet.label||shortAddr(s.wallet.address))}: ${histMetric==="pnl"?usdSigned(row[metricKey]):usd(row[metricKey])}</div>`;
+    });
+    tooltip.innerHTML = html;
+    tooltip.classList.add("show");
+    tooltip.style.left = Math.min(rect.width-160, Math.max(0,(xFor(idx)/W)*rect.width + 10)) + "px";
+    tooltip.style.top = "6px";
+  });
+  capture.addEventListener("mouseleave", () => { tooltip.classList.remove("show"); hoverLine.setAttribute("visibility","hidden"); });
+  svg.appendChild(capture);
+}
 
-    let totalValue = null;
-    if (valResult.status === "fulfilled") totalValue = valResult.value;
-    else if (posResult.status === "fulfilled") totalValue = positions.reduce((s,p) => s + (p.currentValue||0), 0);
+function toCSV(rows, headers){
+  const esc = (v) => { const s = v===null||v===undefined?"":String(v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const lines = [headers.map(h=>esc(h.label)).join(",")];
+  rows.forEach(r => lines.push(headers.map(h=>esc(h.get(r))).join(",")));
+  return lines.join("\n");
+}
+function downloadText(filename, text){
+  const blob = new Blob([text], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
-    setFlap(document.getElementById("stat-value"), totalValue === null ? "—" : usd(totalValue));
-    setFlap(document.getElementById("stat-pnl"), usdSigned(totalCashPnl), totalCashPnl > 0 ? "pos" : (totalCashPnl < 0 ? "neg" : ""));
-    setFlap(document.getElementById("stat-count"), String(positions.length));
-    setFlap(document.getElementById("stat-redeemable"), String(redeemableCount), redeemableCount > 0 ? "pos" : "");
+document.getElementById("export-compare-csv").addEventListener("click", () => {
+  const csv = toCSV(lastCompareRows, [
+    {label:"Wallet", get:r=>r.label}, {label:"Valor actual", get:r=>r.total_value},
+    {label:"P&L", get:r=>r.total_cash_pnl}, {label:"Posiciones", get:r=>r.open_positions},
+    {label:"Actualizado", get:r=>r.captured_at},
+  ]);
+  downloadText("pulse-comparacion.csv", csv);
+});
+document.getElementById("export-hist-pdf").addEventListener("click", () => window.print());
 
-    // Activity
-    if (actResult.status === "fulfilled"){
-      renderActivity(actResult.value);
-    } else {
-      document.getElementById("activity-error-text").textContent =
-        "No se pudo cargar la actividad reciente (" + actResult.reason.message + ").";
-      document.getElementById("activity-error").hidden = false;
-      document.getElementById("activity-list").innerHTML = "";
-      document.getElementById("activity-empty").hidden = true;
-    }
+// ============================================================================
+// OPERACIONES — trade_log
+// ============================================================================
+let lastTradeRows = [];
+async function loadOperaciones(){
+  const { data, error } = await supabase.from("trade_log").select("*").order("occurred_at",{ascending:false}).limit(500);
+  const tbody = document.getElementById("trades-tbody");
+  const emptyEl = document.getElementById("trades-empty");
+  if (error){ console.error(error); return; }
+  lastTradeRows = (data||[]).map(t => { const w = wallets.find(x=>x.id===t.wallet_id); return { ...t, walletLabel: w?(w.label||shortAddr(w.address)):t.wallet_id, walletColor: w?.color||"#8891a3" }; });
+  tbody.innerHTML = "";
+  if (!lastTradeRows.length){ emptyEl.hidden = false; return; }
+  emptyEl.hidden = true;
+  lastTradeRows.forEach(t => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${fmtDateTime(t.occurred_at)}</td>
+      <td class="t-wallet"><span class="wallet-swatch" style="background:${t.walletColor}"></span>${escapeHtml(t.walletLabel)}</td>
+      <td class="${t.side==='BUY'?'':'neg'}" style="color:${t.side==='BUY'?'var(--teal)':'var(--rust)'}">${t.side==='BUY'?'Compra':'Venta'}</td>
+      <td>${escapeHtml(t.title||"")}</td>
+      <td>${escapeHtml(t.outcome||"")}</td>
+      <td class="t-num">${(t.price??0).toFixed(3)}</td>
+      <td class="t-num">${usd(t.usdc_size)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById("export-trades-csv").addEventListener("click", () => {
+  const csv = toCSV(lastTradeRows, [
+    {label:"Fecha", get:r=>r.occurred_at}, {label:"Wallet", get:r=>r.walletLabel}, {label:"Lado", get:r=>r.side},
+    {label:"Mercado", get:r=>r.title}, {label:"Outcome", get:r=>r.outcome}, {label:"Precio", get:r=>r.price}, {label:"Monto", get:r=>r.usdc_size},
+  ]);
+  downloadText("pulse-operaciones.csv", csv);
+});
+document.getElementById("export-trades-pdf").addEventListener("click", () => window.print());
 
-    document.getElementById("last-updated").textContent = "Actualizado " + new Date().toLocaleTimeString("es-BO");
-    document.getElementById("refresh-btn").classList.remove("spinning");
-
-    refreshChipValue(address);
-  }
-
-  document.getElementById("refresh-btn").addEventListener("click", refreshCurrent);
-  document.getElementById("sort-select").addEventListener("change", loadAll);
-  document.getElementById("positions-retry").addEventListener("click", loadAll);
-  document.getElementById("activity-retry").addEventListener("click", loadAll);
-
-  // ---------- auto-refresh ----------
-  function stopAutoRefresh(){
-    if (autoTimer) clearInterval(autoTimer);
-    autoTimer = null;
-  }
-  function restartAutoRefresh(){
-    stopAutoRefresh();
-    const enabled = document.getElementById("auto-refresh").checked;
-    if (!enabled || !activeAddress) return;
-    const interval = parseInt(document.getElementById("refresh-interval").value, 10);
-    autoTimer = setInterval(refreshCurrent, interval);
-  }
-  document.getElementById("auto-refresh").addEventListener("change", restartAutoRefresh);
-  document.getElementById("refresh-interval").addEventListener("change", restartAutoRefresh);
-
-  // ---------- clock ----------
-  function tickClock(){
-    document.getElementById("clock").innerHTML =
-      new Date().toLocaleString("es-BO", {hour:"2-digit", minute:"2-digit", second:"2-digit"}) +
-      ' <span class="dot">●</span> live';
-  }
-  setInterval(tickClock, 1000);
-  tickClock();
-
-  // ---------- init ----------
-  (async function init(){
-    wallets = await loadWallets();
-    renderChips();
-    refreshAllChipValues();
-    refreshAggregateTabs(null);
-    if (wallets.length){
-      setActive(wallets[0].address);
-    } else {
-      showEmptyAppState();
-    }
-  })();
+// ============================================================================
+// boot
+// ============================================================================
+async function boot(){
+  await loadWallets();
+}
 
 })();
 </script>
