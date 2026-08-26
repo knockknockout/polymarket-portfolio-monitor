@@ -68,6 +68,7 @@
   #auth-submit:disabled, #set-password-submit:disabled{ opacity:0.6; cursor:default; }
   .auth-hint{ color:var(--ink-muted); font-size:12.5px; margin:0 0 18px; line-height:1.5; }
   .auth-error{ color:var(--rust); font-family:'IBM Plex Mono',monospace; font-size:12px; margin:10px 0 0; min-height:14px; }
+  .auth-note{ color:var(--teal); font-family:'IBM Plex Mono',monospace; font-size:12px; margin:10px 0 0; min-height:14px; }
   .auth-links{ margin-top:16px; display:flex; justify-content:space-between; font-size:12px; }
   .auth-links[hidden]{ display:none; }
   .auth-links button{ background:none; border:none; color:var(--ink-muted); font-family:'IBM Plex Sans',sans-serif; font-size:12px; cursor:pointer; text-decoration:underline; padding:0; }
@@ -255,6 +256,7 @@
         <input type="password" id="auth-password" autocomplete="current-password">
       </div>
       <button type="submit" id="auth-submit">Entrar</button>
+      <p class="auth-note" id="auth-note"></p>
       <p class="auth-error" id="auth-error"></p>
     </form>
     <div class="auth-links" id="auth-links">
@@ -493,6 +495,7 @@ const authError = document.getElementById("auth-error");
 const authSubmit = document.getElementById("auth-submit");
 const authLinks = document.getElementById("auth-links");
 const authTitle = document.getElementById("auth-title");
+const authNote = document.getElementById("auth-note");
 const setPasswordForm = document.getElementById("set-password-form");
 const setPasswordHint = document.getElementById("set-password-hint");
 const setPasswordError = document.getElementById("set-password-error");
@@ -500,6 +503,7 @@ const setPasswordError = document.getElementById("set-password-error");
 authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   authError.textContent = "";
+  authNote.textContent = "";
   authSubmit.disabled = true;
   const email = document.getElementById("auth-email").value.trim();
   const password = document.getElementById("auth-password").value;
@@ -547,18 +551,35 @@ setPasswordForm.addEventListener("submit", async (e) => {
   const submitBtn = document.getElementById("set-password-submit");
   submitBtn.disabled = true;
   const { data, error } = await supabase.auth.updateUser({ password: pw1 });
-  submitBtn.disabled = false;
-  if (error){ setPasswordError.textContent = "No se pudo guardar la contraseña — intenta de nuevo."; return; }
+  if (error){
+    submitBtn.disabled = false;
+    console.error("Pulse: updateUser error", error);
+    setPasswordError.textContent = "No se pudo guardar la contraseña — intenta de nuevo. (" + (error.message || "error desconocido") + ")";
+    return;
+  }
+  const savedEmail = (data && data.user && data.user.email) || "";
   awaitingNewPassword = false;
   history.replaceState(null, "", window.location.pathname); // limpia el token de la URL
+
+  // la contraseña ya quedó guardada (sin error) — intenta entrar directo con la sesión activa
+  const { data: sessData, error: sessErr } = await supabase.auth.getSession();
+  submitBtn.disabled = false;
+  if (sessData && sessData.session){
+    enterApp(sessData.session);
+    return;
+  }
+
+  // se guardó la contraseña pero no hay sesión activa para entrar automáticamente —
+  // en vez de dejar una pantalla vacía, pide iniciar sesión con la contraseña recién creada
+  console.error("Pulse: sin sesión tras updateUser", sessErr);
   setPasswordForm.hidden = true;
   authForm.hidden = false;
   authLinks.hidden = false;
   authTitle.textContent = "Iniciar sesión";
-  if (data && data.user){
-    const { data: sessData } = await supabase.auth.getSession();
-    if (sessData && sessData.session) enterApp(sessData.session);
-  }
+  authError.textContent = "";
+  authNote.textContent = "Tu contraseña se guardó. Inicia sesión con tu correo y la contraseña que acabas de crear.";
+  if (savedEmail) document.getElementById("auth-email").value = savedEmail;
+  document.getElementById("auth-password").focus();
 });
 
 supabase.auth.onAuthStateChange((event, session) => {
