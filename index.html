@@ -551,17 +551,22 @@ setPasswordForm.addEventListener("submit", async (e) => {
   const submitBtn = document.getElementById("set-password-submit");
   submitBtn.disabled = true;
   const { data, error } = await supabase.auth.updateUser({ password: pw1 });
-  if (error){
+  // Supabase rechaza con este error si la contraseña nueva es igual a la que ya tenías
+  // guardada (p. ej. de un intento anterior que sí funcionó) — no es una falla real,
+  // esa contraseña ya es válida, así que seguimos igual que si hubiera funcionado.
+  const isSamePassword = !!(error && /different from the old password/i.test(error.message || ""));
+  if (error && !isSamePassword){
     submitBtn.disabled = false;
     console.error("Pulse: updateUser error", error);
     setPasswordError.textContent = "No se pudo guardar la contraseña — intenta de nuevo. (" + (error.message || "error desconocido") + ")";
     return;
   }
+  if (isSamePassword) console.info("Pulse: la contraseña ya era esa — la sesión sigue válida.");
   const savedEmail = (data && data.user && data.user.email) || "";
   awaitingNewPassword = false;
   history.replaceState(null, "", window.location.pathname); // limpia el token de la URL
 
-  // la contraseña ya quedó guardada (sin error) — intenta entrar directo con la sesión activa
+  // la contraseña ya quedó guardada (o ya era esa) — intenta entrar directo con la sesión activa
   const { data: sessData, error: sessErr } = await supabase.auth.getSession();
   submitBtn.disabled = false;
   if (sessData && sessData.session){
@@ -569,15 +574,17 @@ setPasswordForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  // se guardó la contraseña pero no hay sesión activa para entrar automáticamente —
-  // en vez de dejar una pantalla vacía, pide iniciar sesión con la contraseña recién creada
+  // no hay sesión activa para entrar automáticamente —
+  // en vez de dejar una pantalla vacía, pide iniciar sesión con esa contraseña
   console.error("Pulse: sin sesión tras updateUser", sessErr);
   setPasswordForm.hidden = true;
   authForm.hidden = false;
   authLinks.hidden = false;
   authTitle.textContent = "Iniciar sesión";
   authError.textContent = "";
-  authNote.textContent = "Tu contraseña se guardó. Inicia sesión con tu correo y la contraseña que acabas de crear.";
+  authNote.textContent = isSamePassword
+    ? "Esa contraseña ya es la tuya (de un intento anterior). Inicia sesión con tu correo y esa misma contraseña."
+    : "Tu contraseña se guardó. Inicia sesión con tu correo y la contraseña que acabas de crear.";
   if (savedEmail) document.getElementById("auth-email").value = savedEmail;
   document.getElementById("auth-password").focus();
 });
