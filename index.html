@@ -453,6 +453,14 @@ const _hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
 const _queryParams = new URLSearchParams(window.location.search);
 const authLinkType = _hashParams.get("type") || _queryParams.get("type") || null;
 let awaitingNewPassword = (authLinkType === "invite" || authLinkType === "recovery");
+let lastKnownSession = null; // última sesión válida vista en onAuthStateChange
+
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise.then((v) => ({ timedOut: false, value: v })),
+    new Promise((resolve) => setTimeout(() => resolve({ timedOut: true, value: null }), ms)),
+  ]);
+}
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 const DATA_BASE = "https://data-api.polymarket.com";
@@ -550,7 +558,17 @@ setPasswordForm.addEventListener("submit", async (e) => {
   if (pw1 !== pw2){ setPasswordError.textContent = "Las contraseñas no coinciden."; return; }
   const submitBtn = document.getElementById("set-password-submit");
   submitBtn.disabled = true;
-  const { data, error } = await supabase.auth.updateUser({ password: pw1 });
+
+  const updateResult = await withTimeout(supabase.auth.updateUser({ password: pw1 }), 15000);
+  if (updateResult.timedOut){
+    // La llamada se quedó colgada (visto en la vida real: se puede deber a tener el
+    // mismo enlace abierto en más de una pestaña). No sabemos si ya guardó o no, así
+    // que no dejamos al usuario mirando una pantalla congelada sin explicación.
+    submitBtn.disabled = false;
+    setPasswordError.textContent = "Esto está tardando demasiado. Cierra otras pestañas de Pulse que tengas abiertas y vuelve a intentar. Si el problema sigue, prueba iniciar sesión directamente con la contraseña que acabas de escribir.";
+    return;
+  }
+  const { data, error } = updateResult.value;
   // Supabase rechaza con este error si la contraseña nueva es igual a la que ya tenías
   // guardada (p. ej. de un intento anterior que sí funcionó) — no es una falla real,
   // esa contraseña ya es válida, así que seguimos igual que si hubiera funcionado.
@@ -562,13 +580,27 @@ setPasswordForm.addEventListener("submit", async (e) => {
     return;
   }
   if (isSamePassword) console.info("Pulse: la contraseña ya era esa — la sesión sigue válida.");
-  const savedEmail = (data && data.user && data.user.email) || "";
+  const savedEmail = (data && data.user && data.user.email) || (lastKnownSession && lastKnownSession.user && lastKnownSession.user.email) || "";
   awaitingNewPassword = false;
   history.replaceState(null, "", window.location.pathname); // limpia el token de la URL
-
-  // la contraseña ya quedó guardada (o ya era esa) — intenta entrar directo con la sesión activa
-  const { data: sessData, error: sessErr } = await supabase.auth.getSession();
   submitBtn.disabled = false;
+
+  // updateUser() ya tuvo éxito (o la contraseña ya era esa), así que la sesión sigue
+  // siendo válida — entramos directo con los datos que ya tenemos, sin depender de
+  // otra llamada de red (getSession) que en algunos navegadores/pestañas se quedaba
+  // colgada indefinidamente y dejaba la pantalla congelada sin ningún error visible.
+  if (data && data.user){
+    enterApp({ user: data.user });
+    return;
+  }
+  if (lastKnownSession){
+    enterApp(lastKnownSession);
+    return;
+  }
+
+  // último recurso, con límite de tiempo — no debería llegar aquí en la práctica
+  const sessResult = await withTimeout(supabase.auth.getSession(), 6000);
+  const sessData = sessResult.timedOut ? null : sessResult.value.data;
   if (sessData && sessData.session){
     enterApp(sessData.session);
     return;
@@ -576,7 +608,7 @@ setPasswordForm.addEventListener("submit", async (e) => {
 
   // no hay sesión activa para entrar automáticamente —
   // en vez de dejar una pantalla vacía, pide iniciar sesión con esa contraseña
-  console.error("Pulse: sin sesión tras updateUser", sessErr);
+  console.error("Pulse: sin sesión tras updateUser");
   setPasswordForm.hidden = true;
   authForm.hidden = false;
   authLinks.hidden = false;
@@ -590,6 +622,7 @@ setPasswordForm.addEventListener("submit", async (e) => {
 });
 
 supabase.auth.onAuthStateChange((event, session) => {
+  if (session) lastKnownSession = session;
   if (event === "PASSWORD_RECOVERY") awaitingNewPassword = true;
   if (session && awaitingNewPassword){
     showSetPasswordScreen();
