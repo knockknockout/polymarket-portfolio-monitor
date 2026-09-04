@@ -390,6 +390,23 @@
   <!-- ============ TAB: OPERACIONES ============ -->
   <div id="tab-operaciones" role="tabpanel" hidden>
     <div class="section-header">
+      <h2>Resumen por wallet</h2>
+    </div>
+    <div class="export-row">
+      <button class="btn-outline" id="export-summary-csv">Exportar CSV</button>
+    </div>
+    <div class="table-wrap" style="margin-bottom:10px;">
+      <table class="data-table" id="summary-table">
+        <thead><tr><th>Wallet</th><th class="t-num">Saldo (pUSD)</th><th class="t-num">P&amp;L neto (después de comisiones)</th><th class="t-num">Comisiones pagadas</th><th>Actualizado</th></tr></thead>
+        <tbody id="summary-tbody"></tbody>
+      </table>
+    </div>
+    <p class="mono" style="font-size:11px;color:var(--ink-muted);margin:0 0 30px;line-height:1.6;">
+      * El saldo y el P&amp;L ya descuentan las comisiones de entrada que cobra Polymarket. Las comisiones pagadas se estiman
+      sumando la última comisión conocida de cada posición que el monitor alcanzó a ver — no incluyen posiciones cerradas antes de empezar a monitorear esa wallet.
+    </p>
+
+    <div class="section-header">
       <h2>Registro de operaciones</h2>
     </div>
     <div class="export-row">
@@ -717,7 +734,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
     ["live","historico","operaciones"].forEach(t => document.getElementById("tab-"+t).hidden = (t !== currentTab));
     if (currentTab === "historico") loadHistorico();
-    if (currentTab === "operaciones") loadOperaciones();
+    if (currentTab === "operaciones") { loadOperaciones(); loadResumen(); }
   });
 });
 
@@ -1037,6 +1054,68 @@ document.getElementById("export-compare-csv").addEventListener("click", () => {
   downloadText("pulse-comparacion.csv", csv);
 });
 document.getElementById("export-hist-pdf").addEventListener("click", () => window.print());
+
+// ============================================================================
+// RESUMEN (pestaña Operaciones) — saldo, P&L neto y comisiones por wallet
+// ============================================================================
+let lastSummaryRows = [];
+async function loadResumen(){
+  if (!wallets.length) return;
+  const [balRes, totRes, feeRes] = await Promise.all([
+    supabase.from("wallet_latest_balance").select("*"),
+    supabase.from("wallet_latest_totals").select("*"),
+    supabase.from("wallet_fee_totals").select("*"),
+  ]);
+  if (balRes.error) console.error(balRes.error);
+  if (totRes.error) console.error(totRes.error);
+  if (feeRes.error) console.error(feeRes.error);
+  const balByWallet = {}; (balRes.data||[]).forEach(r => balByWallet[r.wallet_id] = r);
+  const totByWallet = {}; (totRes.data||[]).forEach(r => totByWallet[r.wallet_id] = r);
+  const feeByWallet = {}; (feeRes.data||[]).forEach(r => feeByWallet[r.wallet_id] = r);
+
+  lastSummaryRows = wallets.map(w => {
+    const bal = balByWallet[w.id];
+    const tot = totByWallet[w.id];
+    const fee = feeByWallet[w.id];
+    const updatedCandidates = [bal?.captured_at, tot?.captured_at].filter(Boolean).sort();
+    return {
+      label: w.label || shortAddr(w.address),
+      color: w.color,
+      balance: bal ? bal.pusd_balance : null,
+      pnl: tot ? tot.total_cash_pnl : null,
+      fees: fee ? fee.total_fees_usdc : null,
+      updated: updatedCandidates.length ? updatedCandidates[updatedCandidates.length-1] : null,
+    };
+  });
+  renderSummaryTable(lastSummaryRows);
+}
+
+function renderSummaryTable(rows){
+  const tbody = document.getElementById("summary-tbody");
+  tbody.innerHTML = "";
+  if (!rows.length){
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--ink-muted);">Todavía no hay datos — corre en cuanto el poller de Supabase esté activo.</td></tr>`;
+    return;
+  }
+  rows.forEach(r => {
+    const pnlCls = r.pnl>0?"pos":(r.pnl<0?"neg":"");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="t-wallet"><span class="wallet-swatch" style="background:${r.color}"></span>${escapeHtml(r.label)}</td>
+      <td class="t-num">${r.balance===null?"—":usd(r.balance)}</td>
+      <td class="t-num ${pnlCls}">${r.pnl===null?"—":usdSigned(r.pnl)}</td>
+      <td class="t-num">${r.fees===null?"—":usd(r.fees)}</td>
+      <td>${r.updated?fmtDateTime(r.updated):"—"}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById("export-summary-csv").addEventListener("click", () => {
+  const csv = toCSV(lastSummaryRows, [
+    {label:"Wallet", get:r=>r.label}, {label:"Saldo (pUSD)", get:r=>r.balance},
+    {label:"P&L neto (despues de comisiones)", get:r=>r.pnl}, {label:"Comisiones pagadas", get:r=>r.fees},
+    {label:"Actualizado", get:r=>r.updated},
+  ]);
+  downloadText("pulse-resumen.csv", csv);
+});
 
 // ============================================================================
 // OPERACIONES — trade_log
