@@ -326,7 +326,7 @@
       <div class="stat-flaps">
         <div class="flap-card"><div class="flap-label">Saldo disponible (pUSD)</div><span class="flap-value" id="stat-balance">—</span></div>
         <div class="flap-card"><div class="flap-label">Valor total</div><span class="flap-value" id="stat-value">—</span></div>
-        <div class="flap-card"><div class="flap-label">P&amp;L (cash)</div><span class="flap-value" id="stat-pnl">—</span></div>
+        <div class="flap-card"><div class="flap-label">P&amp;L total (de por vida)</div><span class="flap-value" id="stat-pnl">—</span></div>
         <div class="flap-card"><div class="flap-label">Posiciones abiertas</div><span class="flap-value" id="stat-count">—</span></div>
       </div>
 
@@ -381,7 +381,7 @@
     </div>
     <div class="table-wrap">
       <table class="data-table" id="compare-table">
-        <thead><tr><th>Wallet</th><th class="t-num">Valor actual</th><th class="t-num">P&amp;L</th><th class="t-num">Posiciones</th><th>Actualizado</th></tr></thead>
+        <thead><tr><th>Wallet</th><th class="t-num">Valor actual</th><th class="t-num">P&amp;L (de por vida)</th><th class="t-num">Posiciones</th><th>Actualizado</th></tr></thead>
         <tbody id="compare-tbody"></tbody>
       </table>
     </div>
@@ -397,13 +397,14 @@
     </div>
     <div class="table-wrap" style="margin-bottom:10px;">
       <table class="data-table" id="summary-table">
-        <thead><tr><th>Wallet</th><th class="t-num">Saldo (pUSD)</th><th class="t-num">P&amp;L neto (después de comisiones)</th><th class="t-num">Comisiones pagadas</th><th>Actualizado</th></tr></thead>
+        <thead><tr><th>Wallet</th><th class="t-num">Saldo (pUSD)</th><th class="t-num">P&amp;L neto (de por vida)</th><th class="t-num">Comisiones pagadas</th><th>Actualizado</th></tr></thead>
         <tbody id="summary-tbody"></tbody>
       </table>
     </div>
     <p class="mono" style="font-size:11px;color:var(--ink-muted);margin:0 0 30px;line-height:1.6;">
-      * El saldo y el P&amp;L ya descuentan las comisiones de entrada que cobra Polymarket. Las comisiones pagadas se estiman
-      sumando la última comisión conocida de cada posición que el monitor alcanzó a ver — no incluyen posiciones cerradas antes de empezar a monitorear esa wallet.
+      * El saldo se calcula on-chain y ya descuenta las comisiones de entrada que cobra Polymarket. El P&amp;L neto es el número
+      real de "toda la vida" (incluye posiciones ya cerradas/redimidas) — el mismo que muestra el perfil público de Polymarket.
+      Las comisiones pagadas se estiman sumando la última comisión conocida de cada posición que el monitor alcanzó a ver — no incluyen posiciones cerradas antes de empezar a monitorear esa wallet.
     </p>
 
     <div class="section-header">
@@ -746,6 +747,27 @@ async function fetchPositions(address){ return fetchJSON(`${DATA_BASE}/positions
 async function fetchValue(address){ const d = await fetchJSON(`${DATA_BASE}/value?user=${address}`); return Array.isArray(d)&&d[0]?d[0].value:null; }
 async function fetchActivity(address){ return fetchJSON(`${DATA_BASE}/activity?user=${address}&limit=15&type=TRADE`); }
 
+// ---- P&L real de Polymarket (de toda la vida — incluye posiciones ya cerradas/redimidas) ----
+// Es el mismo endpoint que usa el perfil público de Polymarket para el número "Beneficio/Pérdida".
+const PNL_API_BASE = "https://user-pnl-api.polymarket.com";
+const pnlSeriesCache = new Map(); // address(lower) -> {ts, promise}
+const PNL_CACHE_TTL_MS = 20000;
+function fetchLifetimePnlSeries(address){
+  const key = (address||"").toLowerCase();
+  const cached = pnlSeriesCache.get(key);
+  if (cached && (Date.now()-cached.ts) < PNL_CACHE_TTL_MS) return cached.promise;
+  const promise = fetchJSON(`${PNL_API_BASE}/user-pnl?user_address=${key}&interval=all&fidelity=1d`)
+    .then(arr => Array.isArray(arr) ? arr.slice().sort((a,b)=>a.t-b.t) : []);
+  pnlSeriesCache.set(key, { ts: Date.now(), promise });
+  promise.catch(()=>pnlSeriesCache.delete(key));
+  return promise;
+}
+async function fetchLifetimePnl(address){
+  const series = await fetchLifetimePnlSeries(address);
+  if (!series.length) return null;
+  return series[series.length-1].p;
+}
+
 async function ethCall(to, data){
   const body = JSON.stringify({ jsonrpc:"2.0", id:1, method:"eth_call", params:[{to,data},"latest"] });
   const errors = [];
@@ -785,21 +807,21 @@ async function loadLive(){
   const address = activeAddress;
   if (!address) return;
   try{
-    const [positions, value, activity, balance] = await Promise.all([
+    const [positions, value, activity, balance, lifetimePnl] = await Promise.all([
       fetchPositions(address).catch(()=>[]),
       fetchValue(address).catch(()=>null),
       fetchActivity(address).catch(()=>[]),
       fetchPusdBalance(address).catch(()=>null),
+      fetchLifetimePnl(address).catch(()=>null),
     ]);
     if (token !== loadToken) return;
     renderPositions(positions);
     renderActivity(activity);
-    const totalPnl = positions.reduce((s,p)=>s+(p.cashPnl||0),0);
     document.getElementById("stat-balance").textContent = balance===null?"—":usd(balance);
     document.getElementById("stat-value").textContent = usd(value);
     const pnlEl = document.getElementById("stat-pnl");
-    pnlEl.textContent = usdSigned(totalPnl);
-    pnlEl.classList.toggle("pos", totalPnl>0); pnlEl.classList.toggle("neg", totalPnl<0);
+    pnlEl.textContent = lifetimePnl===null ? "—" : usdSigned(lifetimePnl);
+    pnlEl.classList.toggle("pos", lifetimePnl>0); pnlEl.classList.toggle("neg", lifetimePnl<0);
     document.getElementById("stat-count").textContent = String(positions.length);
     document.getElementById("live-updated").textContent = "Actualizado " + new Date().toLocaleTimeString("es-BO");
   }catch(e){ console.error(e); }
@@ -901,26 +923,52 @@ async function loadHistorico(){
   if (!wallets.length) return;
   const ids = wallets.filter(w => walletFilterOn.has(w.id)).map(w => w.id);
 
+  // ---- P&L real de Polymarket (de toda la vida) por wallet, para tabla y gráfico ----
+  const lifetimePnlByWallet = {};
+  await Promise.all(wallets.map(async w => {
+    lifetimePnlByWallet[w.id] = await fetchLifetimePnl(w.address).catch(()=>null);
+  }));
+
   // ---- comparación (último corte, todas las wallets) ----
   const { data: latest, error: latestErr } = await supabase.from("wallet_latest_totals").select("*");
   if (!latestErr && latest){
     lastCompareRows = latest.map(r => {
       const w = wallets.find(x => x.id === r.wallet_id);
-      return { ...r, label: w ? (w.label||shortAddr(w.address)) : r.wallet_id, color: w?.color || "#8891a3" };
+      const realPnl = w ? lifetimePnlByWallet[w.id] : null;
+      return {
+        ...r,
+        total_cash_pnl: (realPnl===null || realPnl===undefined) ? r.total_cash_pnl : realPnl,
+        label: w ? (w.label||shortAddr(w.address)) : r.wallet_id,
+        color: w?.color || "#8891a3",
+      };
     });
     renderCompareTable(lastCompareRows);
   }
 
-  // ---- serie histórica ----
-  let query = supabase.from("wallet_daily_totals").select("*");
-  if (histRange > 0){
-    const since = new Date(Date.now() - histRange*86400000).toISOString();
-    query = query.gte("day", since);
+  if (histMetric === "pnl"){
+    // ---- serie histórica de P&L: directamente del endpoint de Polymarket (de toda la vida, día a día) ----
+    const rows = [];
+    await Promise.all(wallets.filter(w => walletFilterOn.has(w.id)).map(async w => {
+      const series = await fetchLifetimePnlSeries(w.address).catch(()=>[]);
+      const sinceSec = histRange > 0 ? (Date.now() - histRange*86400000)/1000 : -Infinity;
+      series.filter(pt => pt.t >= sinceSec).forEach(pt => {
+        rows.push({ wallet_id: w.id, day: new Date(pt.t*1000).toISOString().slice(0,10), total_cash_pnl: pt.p });
+      });
+    }));
+    rows.sort((a,b) => a.day.localeCompare(b.day));
+    renderChart(rows);
+  } else {
+    // ---- serie histórica de valor total: desde Supabase (position_snapshots agregados) ----
+    let query = supabase.from("wallet_daily_totals").select("*");
+    if (histRange > 0){
+      const since = new Date(Date.now() - histRange*86400000).toISOString();
+      query = query.gte("day", since);
+    }
+    if (ids.length) query = query.in("wallet_id", ids);
+    const { data: rows, error } = await query.order("day");
+    if (error){ console.error(error); return; }
+    renderChart(rows || []);
   }
-  if (ids.length) query = query.in("wallet_id", ids);
-  const { data: rows, error } = await query.order("day");
-  if (error){ console.error(error); return; }
-  renderChart(rows || []);
 }
 
 function renderCompareTable(rows){
@@ -1048,7 +1096,7 @@ function downloadText(filename, text){
 document.getElementById("export-compare-csv").addEventListener("click", () => {
   const csv = toCSV(lastCompareRows, [
     {label:"Wallet", get:r=>r.label}, {label:"Valor actual", get:r=>r.total_value},
-    {label:"P&L", get:r=>r.total_cash_pnl}, {label:"Posiciones", get:r=>r.open_positions},
+    {label:"P&L (de por vida)", get:r=>r.total_cash_pnl}, {label:"Posiciones", get:r=>r.open_positions},
     {label:"Actualizado", get:r=>r.captured_at},
   ]);
   downloadText("pulse-comparacion.csv", csv);
@@ -1073,16 +1121,22 @@ async function loadResumen(){
   const totByWallet = {}; (totRes.data||[]).forEach(r => totByWallet[r.wallet_id] = r);
   const feeByWallet = {}; (feeRes.data||[]).forEach(r => feeByWallet[r.wallet_id] = r);
 
+  const lifetimePnlByWallet = {};
+  await Promise.all(wallets.map(async w => {
+    lifetimePnlByWallet[w.id] = await fetchLifetimePnl(w.address).catch(()=>null);
+  }));
+
   lastSummaryRows = wallets.map(w => {
     const bal = balByWallet[w.id];
     const tot = totByWallet[w.id];
     const fee = feeByWallet[w.id];
+    const realPnl = lifetimePnlByWallet[w.id];
     const updatedCandidates = [bal?.captured_at, tot?.captured_at].filter(Boolean).sort();
     return {
       label: w.label || shortAddr(w.address),
       color: w.color,
       balance: bal ? bal.pusd_balance : null,
-      pnl: tot ? tot.total_cash_pnl : null,
+      pnl: (realPnl===null || realPnl===undefined) ? (tot ? tot.total_cash_pnl : null) : realPnl,
       fees: fee ? fee.total_fees_usdc : null,
       updated: updatedCandidates.length ? updatedCandidates[updatedCandidates.length-1] : null,
     };
@@ -1111,7 +1165,7 @@ function renderSummaryTable(rows){
 document.getElementById("export-summary-csv").addEventListener("click", () => {
   const csv = toCSV(lastSummaryRows, [
     {label:"Wallet", get:r=>r.label}, {label:"Saldo (pUSD)", get:r=>r.balance},
-    {label:"P&L neto (despues de comisiones)", get:r=>r.pnl}, {label:"Comisiones pagadas", get:r=>r.fees},
+    {label:"P&L neto (de por vida)", get:r=>r.pnl}, {label:"Comisiones pagadas", get:r=>r.fees},
     {label:"Actualizado", get:r=>r.updated},
   ]);
   downloadText("pulse-resumen.csv", csv);
