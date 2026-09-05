@@ -1382,7 +1382,9 @@ async function loadTabla(){
   const groupEntries = Array.from(groups.values())
     .map(g => {
       const retorno = g.ventas + g.redeem; // no incluye conversiones — ver nota en la pestaña
-      const pnl = retorno + g.valorRestante - g.investedBruta;
+      // Si el evento tuvo conversiones, no sabemos cuánto de ese monto fue efectivo real vs.
+      // una ficha nueva sin resolver — mostrar un P&L numérico ahí sería inventar un dato.
+      const pnl = g.conversionesCount > 0 ? null : (retorno + g.valorRestante - g.investedBruta);
       return { ...g, retorno, pnl, estado: g.openPositions.length ? "abierto" : "cerrado" };
     })
     .filter(g => g.investedBruta > 0 || g.openPositions.length > 0 || g.retorno > 0 || g.conversionesCount > 0);
@@ -1422,7 +1424,7 @@ function renderTablaRows(){
 
   if (tablaGroupByEvent){
     let groups = lastTablaGroups.slice();
-    if (tablaFilterPositivePnl) groups = groups.filter(g => g.pnl > 0);
+    if (tablaFilterPositivePnl) groups = groups.filter(g => g.pnl !== null && g.pnl > 0);
     if (!groups.length){
       wrap.hidden = true; exportRow.hidden = true;
       empty.hidden = false;
@@ -1434,18 +1436,20 @@ function renderTablaRows(){
     empty.hidden = true; wrap.hidden = false; exportRow.hidden = false;
 
     groups.forEach(g => {
-      const pnlCls = g.pnl > 0 ? "pos" : (g.pnl < 0 ? "neg" : "");
+      const pnlKnown = g.pnl !== null;
+      const pnlCls = !pnlKnown ? "" : (g.pnl > 0 ? "pos" : (g.pnl < 0 ? "neg" : ""));
+      const pnlText = pnlKnown ? usdSigned(g.pnl) : "no determinable*";
       const stateBadge = g.estado === "abierto"
         ? `<span class="group-badge open">${g.openPositions.length} abierta${g.openPositions.length === 1 ? "" : "s"}</span>`
         : `<span class="group-badge closed">cerrado</span>`;
       const convNote = g.conversionesCount
-        ? ` · <span class="conversion-note">${g.conversionesCount} conversión${g.conversionesCount === 1 ? "" : "es"} (valor nominal ${usd(g.conversionesNotional)}, no incluido en el P&L — ver nota abajo)</span>`
+        ? ` · <span class="conversion-note">${g.conversionesCount} conversión${g.conversionesCount === 1 ? "" : "es"} (valor nominal ${usd(g.conversionesNotional)}, mezcla efectivo real con una ficha sin resolver — ver nota abajo)</span>`
         : "";
       const groupTr = document.createElement("tr");
       groupTr.className = "group-row";
       groupTr.innerHTML = `<td colspan="9">
         ${stateBadge}<span class="group-name">${escapeHtml(g.label)}</span>
-        <span class="group-meta">invertido ${usd(g.investedBruta)} · retorno ${usd(g.retorno)}${g.valorRestante ? ` · valor restante ${usd(g.valorRestante)}` : ""} · <span class="${pnlCls}">P&amp;L ${usdSigned(g.pnl)}</span>${convNote}</span>
+        <span class="group-meta">invertido ${usd(g.investedBruta)} · retorno confirmado ${usd(g.retorno)}${g.valorRestante ? ` · valor restante ${usd(g.valorRestante)}` : ""} · <span class="${pnlCls}">P&amp;L ${pnlText}</span>${convNote}</span>
       </td>`;
       tbody.appendChild(groupTr);
 
@@ -1491,7 +1495,7 @@ function tablaToCSV(groups){
     lines.push([
       g.label, g.estado === "abierto" ? "Abierto" : "Cerrado", "GRUPO", "", "", "", "",
       g.investedBruta.toFixed(2), g.comisionConocida.toFixed(2), (g.investedBruta + g.comisionConocida).toFixed(2),
-      g.retorno.toFixed(2), g.valorRestante.toFixed(2), g.pnl.toFixed(2), "",
+      g.retorno.toFixed(2), g.valorRestante.toFixed(2), g.pnl === null ? "no determinable (hay conversiones)" : g.pnl.toFixed(2), "",
     ].map(esc).join(","));
     g.openPositions.forEach(p => {
       const bruta = p.initialValue ?? ((p.avgPrice || 0) * (p.size || 0));
