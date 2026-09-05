@@ -219,6 +219,23 @@
   .btn-outline{ background:var(--ink-800); border:1px solid var(--hairline); color:var(--paper); padding:8px 14px; border-radius:7px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif; font-size:12px; font-weight:500; }
   .btn-outline:hover{ border-color:var(--amber); }
 
+  .icon-btn{ background:none; border:1px solid var(--hairline); color:var(--ink-muted); border-radius:6px; padding:4px 8px; cursor:pointer; font-size:12px; }
+  .icon-btn:hover{ color:var(--amber); border-color:var(--amber); }
+
+  .table-filters{ display:flex; flex-wrap:wrap; gap:20px; margin-bottom:14px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-muted); }
+  .filter-toggle{ display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; }
+  .filter-toggle input{ accent-color:var(--amber); cursor:pointer; }
+
+  .group-row td{ background:rgba(227,162,60,0.06); padding:10px 14px; border-bottom:1px solid var(--hairline); white-space:normal; }
+  .group-name{ font-family:'Fraunces',serif; font-weight:600; font-size:13.5px; color:var(--paper); margin-right:12px; }
+  .group-meta{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-muted); }
+  .group-meta .pos{ color:var(--teal); }
+  .group-meta .neg{ color:var(--rust); }
+  .group-badge{ display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.05em; text-transform:uppercase; border-radius:4px; padding:1px 6px; margin-right:10px; border:1px solid var(--hairline); color:var(--ink-muted); }
+  .group-badge.open{ color:var(--amber); border-color:rgba(227,162,60,0.4); }
+  .group-badge.closed{ color:var(--ink-muted); }
+  .conversion-note{ color:var(--ink-muted); font-style:italic; }
+
   footer.note{ margin-top:40px; color:var(--ink-muted); font-size:11.5px; font-family:'IBM Plex Mono',monospace; line-height:1.7; border-top:1px solid var(--hairline); padding-top:16px; }
 
   @media (max-width:640px){
@@ -309,6 +326,7 @@
     <button class="tab-btn active" type="button" role="tab" data-tab="live">En vivo</button>
     <button class="tab-btn" type="button" role="tab" data-tab="historico">Histórico</button>
     <button class="tab-btn" type="button" role="tab" data-tab="operaciones">Operaciones</button>
+    <button class="tab-btn" type="button" role="tab" data-tab="tabla">Tabla</button>
   </nav>
 
   <!-- ============ TAB: EN VIVO ============ -->
@@ -421,6 +439,54 @@
         <tbody id="trades-tbody"></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- ============ TAB: TABLA ============ -->
+  <div id="tab-tabla" role="tabpanel" hidden>
+    <div class="section-header">
+      <h2>Posiciones por evento</h2>
+      <button class="icon-btn" id="tabla-refresh" type="button" title="Volver a consultar">↻ Actualizar</button>
+    </div>
+    <div class="table-filters">
+      <label class="filter-toggle"><input type="checkbox" id="filter-group-event" checked> Agrupar por evento</label>
+      <label class="filter-toggle"><input type="checkbox" id="filter-positive-pnl"> Solo P&amp;L positivo</label>
+    </div>
+    <div class="inline-error" id="tabla-error" hidden>
+      <span id="tabla-error-text"></span>
+      <button type="button" id="tabla-retry">Reintentar</button>
+    </div>
+    <div class="empty-state" id="tabla-loading">Consultando posiciones e historial de todas las wallets…</div>
+    <div class="empty-state" id="tabla-empty" hidden>No hay posiciones ni operaciones en las wallets que monitoreas.</div>
+    <div class="export-row" id="tabla-export-row" hidden>
+      <button class="btn-outline" id="export-tabla-csv">Exportar CSV</button>
+    </div>
+    <div class="table-wrap" id="tabla-wrap" hidden>
+      <table class="data-table" id="tabla-table">
+        <thead>
+          <tr>
+            <th>Mercado</th>
+            <th>Lado</th>
+            <th class="t-num">Cantidad</th>
+            <th class="t-num">Precio prom.</th>
+            <th class="t-num">Inversión bruta</th>
+            <th class="t-num">Comisión</th>
+            <th class="t-num">Inversión neta</th>
+            <th class="t-num">Pago si ocurre</th>
+            <th>Wallet</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-tbody"></tbody>
+      </table>
+    </div>
+    <p class="mono" style="font-size:11px;color:var(--ink-muted);margin:14px 0 30px;line-height:1.6;">
+      * "Inversión bruta" y "Retorno" incluyen posiciones ya cerradas de todo el historial (compras, ventas y cobros de shares
+      ganadoras), no solo lo que sigue abierto. La "Comisión" solo se conoce con exactitud para posiciones todavía abiertas —
+      Polymarket no expone la comisión de operaciones ya cerradas, así que el total de un evento cerrado puede tener comisiones
+      sin descontar. Las conversiones/fusiones de posiciones (típicas de arbitraje) se muestran aparte porque su monto mezcla
+      efectivo real con el valor de una ficha nueva sin resolver, y no se puede separar con los datos públicos de Polymarket —
+      no se suman al P&amp;L automático para evitar un número inflado. Para el P&amp;L total real de cada wallet (que sí incluye
+      todo esto correctamente) usa el dato "P&amp;L neto (de por vida)" en Operaciones o En vivo.
+    </p>
   </div>
 
   <footer class="note">
@@ -733,9 +799,10 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     currentTab = btn.dataset.tab;
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
-    ["live","historico","operaciones"].forEach(t => document.getElementById("tab-"+t).hidden = (t !== currentTab));
+    ["live","historico","operaciones","tabla"].forEach(t => document.getElementById("tab-"+t).hidden = (t !== currentTab));
     if (currentTab === "historico") loadHistorico();
     if (currentTab === "operaciones") { loadOperaciones(); loadResumen(); }
+    if (currentTab === "tabla") loadTabla();
   });
 });
 
@@ -1204,6 +1271,256 @@ document.getElementById("export-trades-csv").addEventListener("click", () => {
   downloadText("pulse-operaciones.csv", csv);
 });
 document.getElementById("export-trades-pdf").addEventListener("click", () => window.print());
+
+// ============================================================================
+// TABLA — posiciones e historial agrupados por evento (todas las wallets)
+// ============================================================================
+let tablaGroupByEvent = true;
+let tablaFilterPositivePnl = false;
+let lastTablaGroups = [];
+
+async function fetchAllActivity(address){
+  const out = [];
+  const limit = 500;
+  let offset = 0;
+  for (let page = 0; page < 20; page++){
+    const batch = await fetchJSON(`${DATA_BASE}/activity?user=${address}&limit=${limit}&offset=${offset}`);
+    if (!Array.isArray(batch) || !batch.length) break;
+    out.push(...batch);
+    if (batch.length < limit) break;
+    offset += limit;
+  }
+  return out;
+}
+
+function tablaEventKey(item){
+  return item.eventSlug || `__solo_${item.slug || item.conditionId || item.title || "sin-titulo"}`;
+}
+function tablaEventLabel(item){
+  if (item.eventSlug){
+    return item.eventSlug.split("-").filter(Boolean).map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(" ");
+  }
+  return item.title || "Otros mercados";
+}
+
+async function loadTabla(){
+  const loadingEl = document.getElementById("tabla-loading");
+  const emptyEl = document.getElementById("tabla-empty");
+  const wrapEl = document.getElementById("tabla-wrap");
+  const exportRowEl = document.getElementById("tabla-export-row");
+  const errorEl = document.getElementById("tabla-error");
+
+  if (!wallets.length){
+    loadingEl.hidden = true; wrapEl.hidden = true; exportRowEl.hidden = true; errorEl.hidden = true;
+    emptyEl.hidden = false;
+    emptyEl.textContent = "Añade una wallet para empezar a monitorear.";
+    return;
+  }
+
+  loadingEl.hidden = false;
+  emptyEl.hidden = true;
+  wrapEl.hidden = true;
+  exportRowEl.hidden = true;
+  errorEl.hidden = true;
+
+  let failCount = 0;
+  const perWallet = await Promise.all(wallets.map(async w => {
+    try{
+      const [positions, activity] = await Promise.all([
+        fetchPositions(w.address),
+        fetchAllActivity(w.address),
+      ]);
+      return { wallet: w, positions: positions||[], activity: activity||[] };
+    }catch(e){
+      failCount++;
+      return { wallet: w, positions: [], activity: [] };
+    }
+  }));
+
+  loadingEl.hidden = true;
+  if (failCount > 0){
+    document.getElementById("tabla-error-text").textContent =
+      `No se pudieron consultar ${failCount} de ${wallets.length} wallet(s). La tabla puede estar incompleta.`;
+    errorEl.hidden = false;
+  }
+
+  const groups = new Map();
+  function ensureGroup(key, label){
+    if (!groups.has(key)){
+      groups.set(key, {
+        key, label,
+        openPositions: [],
+        investedBruta: 0, ventas: 0, redeem: 0,
+        conversionesNotional: 0, conversionesCount: 0,
+        comisionConocida: 0, valorRestante: 0,
+      });
+    }
+    return groups.get(key);
+  }
+
+  perWallet.forEach(({ wallet, positions, activity }) => {
+    positions.forEach(p => {
+      const g = ensureGroup(tablaEventKey(p), tablaEventLabel(p));
+      g.openPositions.push({ ...p, _wallet: wallet });
+      g.valorRestante += (p.currentValue || 0);
+      g.comisionConocida += (p.entryFeesUsdc || 0);
+    });
+    activity.forEach(a => {
+      const g = ensureGroup(tablaEventKey(a), tablaEventLabel(a));
+      if (a.type === "TRADE"){
+        if (a.side === "BUY") g.investedBruta += (a.usdcSize || 0);
+        else if (a.side === "SELL") g.ventas += (a.usdcSize || 0);
+      } else if (a.type === "REDEEM"){
+        g.redeem += (a.usdcSize || 0);
+      } else if (a.type === "CONVERSION"){
+        g.conversionesNotional += (a.usdcSize || 0);
+        g.conversionesCount += 1;
+      }
+    });
+  });
+
+  const groupEntries = Array.from(groups.values())
+    .map(g => {
+      const retorno = g.ventas + g.redeem; // no incluye conversiones — ver nota en la pestaña
+      const pnl = retorno + g.valorRestante - g.investedBruta;
+      return { ...g, retorno, pnl, estado: g.openPositions.length ? "abierto" : "cerrado" };
+    })
+    .filter(g => g.investedBruta > 0 || g.openPositions.length > 0 || g.retorno > 0 || g.conversionesCount > 0);
+
+  groupEntries.sort((a, b) => (b.valorRestante + b.retorno + b.investedBruta) - (a.valorRestante + a.retorno + a.investedBruta));
+
+  lastTablaGroups = groupEntries;
+  renderTablaRows();
+}
+
+function buildOpenRowCells(p){
+  const bruta = p.initialValue ?? ((p.avgPrice || 0) * (p.size || 0));
+  const comision = p.entryFeesUsdc || 0;
+  const neta = p.grossInitialValue ?? (bruta + comision);
+  const payoutIfWins = p.size || 0; // 1 share ganadora se redime por $1
+  const posClass = p.outcome === "Yes" ? "yes" : "no";
+  const walletLabel = p._wallet.label ? escapeHtml(p._wallet.label) : shortAddr(p._wallet.address);
+  return `
+    <td class="t-outcome" title="${escapeHtml(p.title || "")}">${escapeHtml(p.title || "Mercado sin título")}</td>
+    <td><span class="outcome-badge ${posClass}">${p.outcome === "Yes" ? "YES" : "NO"}</span></td>
+    <td class="t-num">${(p.size || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
+    <td class="t-num">${(p.avgPrice ?? 0).toFixed(3)}</td>
+    <td class="t-num">${usd(bruta)}</td>
+    <td class="t-num">${usd(comision)}</td>
+    <td class="t-num">${usd(neta)}</td>
+    <td class="t-num pos">${usd(payoutIfWins)}</td>
+    <td class="t-wallet"><span class="wallet-swatch" style="background:${p._wallet.color}"></span>${walletLabel}</td>
+  `;
+}
+
+function renderTablaRows(){
+  const tbody = document.getElementById("tabla-tbody");
+  const wrap = document.getElementById("tabla-wrap");
+  const exportRow = document.getElementById("tabla-export-row");
+  const empty = document.getElementById("tabla-empty");
+  tbody.innerHTML = "";
+
+  if (tablaGroupByEvent){
+    let groups = lastTablaGroups.slice();
+    if (tablaFilterPositivePnl) groups = groups.filter(g => g.pnl > 0);
+    if (!groups.length){
+      wrap.hidden = true; exportRow.hidden = true;
+      empty.hidden = false;
+      empty.textContent = tablaFilterPositivePnl
+        ? "Ningún evento tiene P&L positivo en este momento."
+        : "No hay posiciones ni operaciones en las wallets que monitoreas.";
+      return;
+    }
+    empty.hidden = true; wrap.hidden = false; exportRow.hidden = false;
+
+    groups.forEach(g => {
+      const pnlCls = g.pnl > 0 ? "pos" : (g.pnl < 0 ? "neg" : "");
+      const stateBadge = g.estado === "abierto"
+        ? `<span class="group-badge open">${g.openPositions.length} abierta${g.openPositions.length === 1 ? "" : "s"}</span>`
+        : `<span class="group-badge closed">cerrado</span>`;
+      const convNote = g.conversionesCount
+        ? ` · <span class="conversion-note">${g.conversionesCount} conversión${g.conversionesCount === 1 ? "" : "es"} (valor nominal ${usd(g.conversionesNotional)}, no incluido en el P&L — ver nota abajo)</span>`
+        : "";
+      const groupTr = document.createElement("tr");
+      groupTr.className = "group-row";
+      groupTr.innerHTML = `<td colspan="9">
+        ${stateBadge}<span class="group-name">${escapeHtml(g.label)}</span>
+        <span class="group-meta">invertido ${usd(g.investedBruta)} · retorno ${usd(g.retorno)}${g.valorRestante ? ` · valor restante ${usd(g.valorRestante)}` : ""} · <span class="${pnlCls}">P&amp;L ${usdSigned(g.pnl)}</span>${convNote}</span>
+      </td>`;
+      tbody.appendChild(groupTr);
+
+      if (g.openPositions.length){
+        g.openPositions.slice().sort((a, b) => (b.currentValue || 0) - (a.currentValue || 0)).forEach(p => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = buildOpenRowCells(p);
+          tbody.appendChild(tr);
+        });
+      } else {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="9" style="color:var(--ink-muted);font-style:italic;">Todas las posiciones de este evento ya se cerraron — revisa el detalle en Operaciones.</td>`;
+        tbody.appendChild(tr);
+      }
+    });
+  } else {
+    let flat = [];
+    lastTablaGroups.forEach(g => g.openPositions.forEach(p => flat.push(p)));
+    if (tablaFilterPositivePnl) flat = flat.filter(p => (p.cashPnl || 0) > 0);
+    if (!flat.length){
+      wrap.hidden = true; exportRow.hidden = true;
+      empty.hidden = false;
+      empty.textContent = tablaFilterPositivePnl
+        ? "Ninguna posición tiene P&L positivo en este momento."
+        : "No hay posiciones abiertas en las wallets que monitoreas.";
+      return;
+    }
+    empty.hidden = true; wrap.hidden = false; exportRow.hidden = false;
+    flat.sort((a, b) => (b.currentValue || 0) - (a.currentValue || 0));
+    flat.forEach(p => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = buildOpenRowCells(p);
+      tbody.appendChild(tr);
+    });
+  }
+}
+
+function tablaToCSV(groups){
+  const header = ["Evento","Estado","Fila","Mercado","Lado","Cantidad","Precio promedio","Inversión bruta","Comisión","Inversión neta","Pago si ocurre / Retorno","Valor restante","P&L grupo","Wallet"];
+  const esc = (v) => { const s = v===null||v===undefined?"":String(v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const lines = [header.map(esc).join(",")];
+  groups.forEach(g => {
+    lines.push([
+      g.label, g.estado === "abierto" ? "Abierto" : "Cerrado", "GRUPO", "", "", "", "",
+      g.investedBruta.toFixed(2), g.comisionConocida.toFixed(2), (g.investedBruta + g.comisionConocida).toFixed(2),
+      g.retorno.toFixed(2), g.valorRestante.toFixed(2), g.pnl.toFixed(2), "",
+    ].map(esc).join(","));
+    g.openPositions.forEach(p => {
+      const bruta = p.initialValue ?? ((p.avgPrice || 0) * (p.size || 0));
+      const comision = p.entryFeesUsdc || 0;
+      const neta = p.grossInitialValue ?? (bruta + comision);
+      const walletLabel = p._wallet.label || shortAddr(p._wallet.address);
+      lines.push([
+        g.label, "", "Posición", p.title || "", p.outcome || "", p.size || 0, (p.avgPrice || 0).toFixed(3),
+        bruta.toFixed(2), comision.toFixed(2), neta.toFixed(2), (p.size || 0).toFixed(2),
+        p.currentValue != null ? p.currentValue.toFixed(2) : "", "", walletLabel,
+      ].map(esc).join(","));
+    });
+  });
+  return lines.join("\n");
+}
+
+document.getElementById("filter-group-event").addEventListener("change", (e) => {
+  tablaGroupByEvent = e.target.checked;
+  renderTablaRows();
+});
+document.getElementById("filter-positive-pnl").addEventListener("change", (e) => {
+  tablaFilterPositivePnl = e.target.checked;
+  renderTablaRows();
+});
+document.getElementById("tabla-refresh").addEventListener("click", loadTabla);
+document.getElementById("tabla-retry").addEventListener("click", loadTabla);
+document.getElementById("export-tabla-csv").addEventListener("click", () => {
+  downloadText("pulse-tabla-por-evento.csv", tablaToCSV(lastTablaGroups));
+});
 
 // ============================================================================
 // boot
