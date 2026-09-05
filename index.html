@@ -1296,11 +1296,34 @@ async function fetchAllActivity(address){
 function tablaEventKey(item){
   return item.eventSlug || `__solo_${item.slug || item.conditionId || item.title || "sin-titulo"}`;
 }
-function tablaEventLabel(item){
-  if (item.eventSlug){
-    return item.eventSlug.split("-").filter(Boolean).map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(" ");
+// Nombre "de respaldo" a partir del slug: le quita el sufijo numérico interno que
+// Polymarket agrega a eventos sin curar (ej. "...-winner-20260702211117571") y
+// convierte el resto en Título Legible.
+function tablaSlugLabel(eventSlug){
+  const cleaned = eventSlug.replace(/-\d{8,}$/, "");
+  return cleaned.split("-").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+// Si algún mercado del grupo tiene un título tipo "X vs. Y..." lo usamos como nombre
+// del evento — es mucho más legible que el slug ("kor-jej-poh-2026-07-18...") y deja
+// claro qué partido/carrera agrupa, evitando que parezca una clasificación al azar.
+function tablaVsLabel(title){
+  if (!title) return null;
+  const t = title.trim().replace(/\?$/, "");
+  let m = t.match(/^Will\s+(.+\bvs\.?\s+.+?)\s+end in a draw$/i);
+  if (m) return m[1];
+  m = t.match(/^(.+\bvs\.?\s+.+?):\s*.+$/i);
+  if (m) return m[1];
+  m = t.match(/^(.+\bvs\.?\s+.+)$/i);
+  if (m) return m[1];
+  return null;
+}
+function tablaEventLabel(eventSlug, titles){
+  for (const t of titles){
+    const vs = tablaVsLabel(t);
+    if (vs) return vs;
   }
-  return item.title || "Otros mercados";
+  if (eventSlug) return tablaSlugLabel(eventSlug);
+  return Array.from(titles)[0] || "Otros mercados";
 }
 
 async function loadTabla(){
@@ -1345,10 +1368,10 @@ async function loadTabla(){
   }
 
   const groups = new Map();
-  function ensureGroup(key, label){
+  function ensureGroup(key, eventSlug){
     if (!groups.has(key)){
       groups.set(key, {
-        key, label,
+        key, eventSlug, titles: new Set(),
         openPositions: [],
         investedBruta: 0, ventas: 0, redeem: 0,
         conversionesNotional: 0, conversionesCount: 0,
@@ -1360,13 +1383,15 @@ async function loadTabla(){
 
   perWallet.forEach(({ wallet, positions, activity }) => {
     positions.forEach(p => {
-      const g = ensureGroup(tablaEventKey(p), tablaEventLabel(p));
+      const g = ensureGroup(tablaEventKey(p), p.eventSlug);
+      if (p.title) g.titles.add(p.title);
       g.openPositions.push({ ...p, _wallet: wallet });
       g.valorRestante += (p.currentValue || 0);
       g.comisionConocida += (p.entryFeesUsdc || 0);
     });
     activity.forEach(a => {
-      const g = ensureGroup(tablaEventKey(a), tablaEventLabel(a));
+      const g = ensureGroup(tablaEventKey(a), a.eventSlug);
+      if (a.title) g.titles.add(a.title);
       if (a.type === "TRADE"){
         if (a.side === "BUY") g.investedBruta += (a.usdcSize || 0);
         else if (a.side === "SELL") g.ventas += (a.usdcSize || 0);
@@ -1381,11 +1406,12 @@ async function loadTabla(){
 
   const groupEntries = Array.from(groups.values())
     .map(g => {
+      const label = tablaEventLabel(g.eventSlug, g.titles);
       const retorno = g.ventas + g.redeem; // no incluye conversiones — ver nota en la pestaña
       // Si el evento tuvo conversiones, no sabemos cuánto de ese monto fue efectivo real vs.
       // una ficha nueva sin resolver — mostrar un P&L numérico ahí sería inventar un dato.
       const pnl = g.conversionesCount > 0 ? null : (retorno + g.valorRestante - g.investedBruta);
-      return { ...g, retorno, pnl, estado: g.openPositions.length ? "abierto" : "cerrado" };
+      return { ...g, label, retorno, pnl, estado: g.openPositions.length ? "abierto" : "cerrado" };
     })
     .filter(g => g.investedBruta > 0 || g.openPositions.length > 0 || g.retorno > 0 || g.conversionesCount > 0);
 
